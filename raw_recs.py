@@ -15,40 +15,41 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
-    scope=scope
+    scope=scope,
+    open_browser=True,
+    cache_path=".cache"
 ))
 
-# ✅ Keep seeds as lists
-track_ids = ["32OlwWuMpZ6b0aN2RZOeMS"]   # Uptown Funk
-artist_ids = ["3TVXtAsR1Inumwj472S9r4"]  # Drake
-genres = ["pop"]
+# Example IDs
+track_id = "32OlwWuMpZ6b0aN2RZOeMS"   # Uptown Funk
+artist_id = "3TVXtAsR1Inumwj472S9r4"  # Drake
 
-def try_recs(label, **kwargs):
-    print(f"\n➡️ Trying {label} with params: {kwargs}")
-    try:
-        recs = sp.recommendations(limit=5, **kwargs)
-        tracks = recs.get("tracks", [])
-        if not tracks:
-            print("⚠️ No tracks returned")
-        else:
-            for t in tracks:
-                print(f"- {t['name']} by {', '.join(a['name'] for a in t['artists'])}")
-    except Exception as e:
-        print(f"❌ Request failed: {e}")
+print("\n--- TESTING ENDPOINTS ---")
 
-if __name__ == "__main__":
-    # Test each seed type separately
-    try_recs("Tracks only", seed_tracks=track_ids)
-    try_recs("Artists only", seed_artists=artist_ids)
-    try_recs("Genres only", seed_genres=genres)
+# 1. Recommendations
+try:
+    recs = sp.recommendations(limit=5, seed_tracks=track_id)
+    print("✅ Recommendations: WORKED, got", len(recs.get("tracks", [])), "tracks")
+except Exception as e:
+    print("❌ Recommendations FAILED:", e)
 
-    # Test combined seeds
-    try_recs("Tracks + Artists", seed_tracks=track_ids, seed_artists=artist_ids)
-    try_recs("Tracks + Genres", seed_tracks=track_ids, seed_genres=genres)
-    try_recs("Artists + Genres", seed_artists=artist_ids, seed_genres=genres)
+# 2. Audio Features
+try:
+    features = sp.audio_features([track_id])
+    print("✅ Audio Features: WORKED →", features[0])
+except Exception as e:
+    print("❌ Audio Features FAILED:", e)
 
-    # Full combo
-    try_recs("Tracks + Artists + Genres",
-             seed_tracks=track_ids,
-             seed_artists=artist_ids,
-             seed_genres=genres)
+# 3. Audio Analysis
+try:
+    analysis = sp.audio_analysis(track_id)
+    print("✅ Audio Analysis: WORKED → got sections:", len(analysis.get("sections", [])))
+except Exception as e:
+    print("❌ Audio Analysis FAILED:", e)
+
+# 4. Related Artists
+try:
+    related = sp.artist_related_artists(artist_id)
+    print("✅ Related Artists: WORKED → got", len(related.get("artists", [])), "artists")
+except Exception as e:
+    print("❌ Related Artists FAILED:", e)

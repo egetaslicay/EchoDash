@@ -102,10 +102,10 @@ def recommendations():
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
 
-    top_tracks = sp.current_user_top_tracks(limit=20, time_range="medium_term")["items"]
-    top_artists = sp.current_user_top_artists(limit=20, time_range="medium_term")["items"]
+    top_tracks = sp.current_user_top_tracks(limit=50, time_range="medium_term")["items"]
+    top_artists = sp.current_user_top_artists(limit=50, time_range="medium_term")["items"]
 
-    recs = get_recommendations(sp, top_tracks, top_artists, limit=10)
+    recs = get_recommendations(sp, top_tracks, top_artists, limit=50)
 
     return render_template("recommendations.html", recs=recs)
 

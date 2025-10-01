@@ -3,5 +3,7 @@ requests
 python-dotenv
 plotly
 spotipy
-scikit-learn
 numpy
+python-dotenv
+pandas
+scikit-learn

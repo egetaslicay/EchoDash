@@ -142,24 +142,38 @@
       </div>
     </div>
 
-    <!-- Recommendations Section -->
-    <div class="card shadow-sm mt-5">
-      <div class="card-body">
-        <h4 class="card-title text-success">Your Recommendations</h4>
-        <ol class="list-group list-group-numbered">
-          {% for rec in recs %}
-            <li class="list-group-item">
-              <img src="{{ rec.album.images[2].url if rec.album.images }}" alt="Album Art" class="rec-img me-2">
-              <div>
-                <strong>{{ rec.name }}</strong><br>
-                <small class="text-muted">by {{ rec.artists[0].name }}</small>
-              </div>
-              <a href="{{ rec.external_urls.spotify }}" target="_blank" class="btn btn-sm btn-primary ms-auto">Open in Spotify</a>
-            </li>
-          {% endfor %}
-        </ol>
-      </div>
-    </div>
+  <!-- Recommendations Section -->
+<div class="card shadow-sm mt-5">
+  <div class="card-body">
+    <h4 class="card-title text-success">Your Recommendations</h4>
+    <ol class="list-group list-group-numbered">
+      {% for rec in recs %}
+        <li class="list-group-item d-flex align-items-center">
+          <img src="{{ rec.album_image }}" alt="Album Art" class="rec-img me-2">
+
+          <div>
+            <strong>{{ rec.name }}</strong><br>
+            <small class="text-muted">by {{ rec.artist }}</small><br>
+            <small class="text-muted">Score: {{ "%.2f"|format(rec.score) }}</small>
+          </div>
+
+          {% if rec.preview_url %}
+            <audio controls class="ms-3" style="height:30px;">
+              <source src="{{ rec.preview_url }}" type="audio/mpeg">
+              Your browser does not support the audio element.
+            </audio>
+          {% endif %}
+
+          <a href="https://open.spotify.com/track/{{ rec.id }}" 
+             target="_blank" 
+             class="btn btn-sm btn-primary ms-auto">
+             Open in Spotify
+          </a>
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
 
   </div>
 
