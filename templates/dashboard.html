@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EchoDash Dashboard</title>
+  <title>Statify Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body {
@@ -67,7 +67,7 @@
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
-      <a class="navbar-brand" href="#">EchoDash</a>
+      <a class="navbar-brand" href="#">Statify</a>
       <div class="d-flex align-items-center">
         {% if user_image %}
           <img src="{{ user_image }}" alt="User Profile" class="profile-img">
@@ -77,12 +77,12 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
+  
   <div class="container my-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2 class="dashboard-title">Your Dashboard</h2>
 
-      <!-- Filters -->
+    
       <form method="get" action="{{ url_for('dashboard') }}" class="d-flex gap-2">
         <select class="form-select" name="time_range" onchange="this.form.submit()">
           <option value="short_term" {% if time_range == 'short_term' %}selected{% endif %}>Last Month</option>
@@ -100,9 +100,8 @@
       </form>
     </div>
 
-    <!-- Row for Tracks and Artists -->
     <div class="row">
-      <!-- Top Tracks -->
+     
       <div class="col-md-6">
         <div class="card shadow-sm mb-4">
           <div class="card-body">
@@ -122,7 +121,7 @@
         </div>
       </div>
 
-      <!-- Top Artists -->
+     
       <div class="col-md-6">
         <div class="card shadow-sm mb-4">
           <div class="card-body">
@@ -142,7 +141,7 @@
       </div>
     </div>
 
-  <!-- Recommendations Section -->
+ 
 <div class="card shadow-sm mt-5">
   <div class="card-body">
     <h4 class="card-title text-success">Your Recommendations</h4>

@@ -4,22 +4,21 @@ from flask import Flask, redirect, request, session, url_for, render_template
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
-from recommender import get_recommendations  # <-- use the one from recommender.py
+from recommender import get_recommendations  
 
-# Load environment variables
+
 load_dotenv()
 
-# Flask setup
+
 app = Flask(__name__)
 app.secret_key = "replace_this_with_a_secure_random_key"
 
-# Spotify credentials
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 SCOPE = "user-top-read"
 
-# Helper: per-session SpotifyOAuth
+
 def create_spotify_oauth(force_reauth=False):
     return SpotifyOAuth(
         client_id=CLIENT_ID,
@@ -30,7 +29,7 @@ def create_spotify_oauth(force_reauth=False):
         show_dialog=force_reauth
     )
 
-# Home (login page only)
+
 @app.route("/")
 def home():
     return render_template("login.html")
@@ -70,18 +69,18 @@ def dashboard():
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
 
-    # User profile (for picture)
+  
     user_profile = sp.current_user()
     user_image = user_profile["images"][0]["url"] if user_profile["images"] else None
 
-    # Time range + limit
+   
     time_range = request.args.get("time_range", "short_term")
     limit = int(request.args.get("limit", 10))
 
     tracks = sp.current_user_top_tracks(limit=limit, time_range=time_range)["items"]
     artists = sp.current_user_top_artists(limit=limit, time_range=time_range)["items"]
 
-    # Recommendations (always based on medium_term for variety)
+   
     recs = get_recommendations(sp, tracks, artists, limit=10)
 
     return render_template(
