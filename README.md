@@ -1,10 +1,10 @@
-# 🎧 EchoDash
+# EchoDash
 
 **EchoDash** is a full-stack web application that connects to your favorite platforms (starting with Spotify) and visualizes your personal entertainment data through interactive dashboards.
 
-## 🚀 Features
+## Features
 
-### 🎨 Modern, Clean UI
+### Modern, Clean UI
 - **Glassmorphism design** with translucent cards and backdrop blur effects
 - **Smooth animations** - entrance effects, hover states, and transitions
 - **Gradient color scheme** - Purple-blue gradients with Spotify green accents
@@ -12,24 +12,24 @@
 - **Interactive elements** - Hover effects, elevated cards, and smooth transitions
 - **Professional typography** - Inter font for clean, modern readability
 
-### 🎵 Smart Music Features
-- 🎶 **Spotify integration** → Track your top tracks, artists, and listening history
-- 🤖 **ML-powered recommendations** using audio features (acousticness, danceability, energy, tempo, etc.)
-- 🎯 **Multi-tier recommendation system**:
+### Smart Music Features
+- **Spotify integration** - Track your top tracks, artists, and listening history
+- **ML-powered recommendations** using audio features (acousticness, danceability, energy, tempo, etc.)
+- **Multi-tier recommendation system**:
   - Primary: ML-based cosine similarity on audio features
   - Fallback: Last.fm collaborative filtering
   - Basic: Spotify related artists
-- 📊 **Visual similarity scores** - See how well each recommendation matches your taste
-- 🎧 **Audio previews** - Listen to 30-second clips directly in the dashboard
-- 🔗 **One-click Spotify links** - Open any track directly in Spotify
+- **Visual similarity scores** - See how well each recommendation matches your taste
+- **Audio previews** - Listen to 30-second clips directly in the dashboard
+- **One-click Spotify links** - Open any track directly in Spotify
 
-### 🛡️ Technical Features
-- 🔑 Secure OAuth 2.0 authentication
-- 🔐 Environment-based API key management
-- ☁️ Cloud-ready deployment (Render/Heroku)
-- 📱 Fully responsive design
+### Technical Features
+- Secure OAuth 2.0 authentication
+- Environment-based API key management
+- Cloud-ready deployment (Render/Heroku)
+- Fully responsive design
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 - **Python (Flask)** - Web framework
@@ -57,7 +57,7 @@
 - PostgreSQL (planned)
 - Cloud-ready (Render/Heroku compatible)
 
-## ⚡ Setup
+## Setup
 
 ### 1. Clone the repository
 ```bash
@@ -114,7 +114,7 @@ python app.py
 
 Visit `http://localhost:5000` in your browser and log in with Spotify!
 
-## 🎨 UI Showcase
+## UI Showcase
 
 ### Login Page
 The login page features a **modern glassmorphism design** with:
@@ -131,9 +131,9 @@ The dashboard offers a **clean, card-based layout** with:
 - **Large, readable typography** - "Your Music Universe" header with gradient text
 - **Filter controls** - Time range (last month/6 months/12 months) and limit selectors
 - **Color-coded sections**:
-  - 🟣 **Purple gradient** - Top Tracks section
-  - 🌸 **Pink gradient** - Top Artists section
-  - 🔵 **Cyan gradient** - ML-Powered Recommendations
+  - **Purple gradient** - Top Tracks section
+  - **Pink gradient** - Top Artists section
+  - **Cyan gradient** - ML-Powered Recommendations
 - **Interactive track/artist cards**:
   - Album art thumbnails with rounded corners
   - Track/artist names with clear hierarchy
@@ -153,7 +153,7 @@ The dashboard offers a **clean, card-based layout** with:
 - **Borders**: Rounded corners (15-30px radius)
 - **Animations**: 0.3s ease transitions on all interactions
 
-## 🎯 How It Works
+## How It Works
 
 ### ML-Based Recommendation Engine (Primary)
 
@@ -187,6 +187,6 @@ If RapidAPI is not configured, the system falls back to:
 - **Tempo**: Overall estimated tempo in beats per minute (BPM)
 - **Valence**: Musical positivity - high valence = happy/cheerful, low valence = sad/angry (0.0 to 1.0)
 
-## 📝 Note
+## Note
 
 For **best recommendations**, set up RapidAPI. The ML algorithm provides superior recommendations compared to collaborative filtering alone because it analyzes actual musical characteristics.
