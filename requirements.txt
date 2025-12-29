@@ -4,6 +4,6 @@ python-dotenv
 plotly
 spotipy
 numpy
-python-dotenv
 pandas
 scikit-learn
+pylast
