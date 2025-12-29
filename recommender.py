@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from lastfm_service import get_lastfm_service
+from ml_recommender import get_recommendations_ml
 
 
 
@@ -79,21 +80,51 @@ def recommend_tracks(top_tracks, candidates, top_n=10):
 
 def get_recommendations(sp, top_tracks, top_artists, limit=50):
     """
-    Generate up to `limit` fresh recommendations using Last.fm API:
-    - Gets similar tracks for user's top tracks
-    - Gets similar artists for user's top artists
-    - Uses real Last.fm similarity scores (collaborative filtering)
-    - Enriches with Spotify metadata (album art, preview URLs)
-    - Filters out songs the user already knows
+    Generate up to `limit` fresh recommendations using ML-based audio feature analysis.
+
+    Recommendation Strategy (in order of priority):
+    1. ML-based: Uses audio features (acousticness, danceability, energy, etc.)
+       with cosine similarity to find tracks similar to user's taste
+    2. Last.fm: Collaborative filtering based on similar tracks/artists
+    3. Fallback: Basic recommendation using Spotify's related artists
+
+    Args:
+        sp: Spotipy client
+        top_tracks: User's top tracks
+        top_artists: User's top artists
+        limit: Number of recommendations to return
+
+    Returns:
+        List of recommended tracks with metadata
     """
 
-    # Initialize Last.fm service
+    # Try ML-based recommendations first (best quality)
+    try:
+        print("Attempting ML-based recommendations using audio features...")
+        recommendations = get_recommendations_ml(sp, top_tracks, top_artists, limit)
+        if recommendations:
+            return recommendations
+        print("ML recommendations returned empty, trying fallback...")
+    except Exception as e:
+        print(f"ML recommender not available: {e}")
+        print("Falling back to Last.fm...")
+
+    # Try Last.fm collaborative filtering
     try:
         lastfm = get_lastfm_service()
+        return _get_recommendations_lastfm(sp, top_tracks, top_artists, limit, lastfm)
     except ValueError as e:
         print(f"Last.fm service not available: {e}")
-        # Fallback to old method if Last.fm is not configured
+        # Fallback to basic method if Last.fm is not configured
         return _get_recommendations_fallback(sp, top_tracks, top_artists, limit)
+
+
+
+def _get_recommendations_lastfm(sp, top_tracks, top_artists, limit, lastfm):
+    """
+    Last.fm-based recommendations using collaborative filtering.
+    """
+    print("Using Last.fm collaborative filtering...")
 
     # Collect all user's known track IDs
     user_track_ids = set()
