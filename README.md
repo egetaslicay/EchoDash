@@ -312,7 +312,11 @@ The dashboard offers a **clean, card-based layout** with:
 
  
 
-### ML-Based Recommendation Engine (Primary)
+### Spotify API
+1. Visit [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Create new application
+3. Copy Client ID and Client Secret
+4. Add `http://localhost:5000/callback` to Redirect URIs
 
  
 
@@ -380,4 +384,4 @@ If RapidAPI is not configured, the system falls back to:
 
  
 
-For **best recommendations**, set up RapidAPI. The ML algorithm provides superior recommendations compared to collaborative filtering alone because it analyzes actual musical characteristics.
+Built with passion for music and data science.
