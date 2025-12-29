@@ -11,7 +11,10 @@ load_dotenv()
 
 
 app = Flask(__name__)
-app.secret_key = "replace_this_with_a_secure_random_key"
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+if not app.secret_key:
+    raise ValueError("FLASK_SECRET_KEY must be set in .env file")
 
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
