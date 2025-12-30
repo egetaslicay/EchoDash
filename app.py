@@ -1,10 +1,14 @@
 import os
 import uuid
-from flask import Flask, redirect, request, session, url_for, render_template
+from flask import Flask, redirect, request, session, url_for, render_template, jsonify
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
-from recommender import get_recommendations  
+from recommender import get_recommendations
+import plotly
+import plotly.graph_objs as go
+import json
+import numpy as np  
 
 
 load_dotenv()
