@@ -8,7 +8,8 @@ from recommender import get_recommendations
 import plotly
 import plotly.graph_objs as go
 import json
-import numpy as np  
+import numpy as np
+import database as db  
 
 
 load_dotenv()
@@ -58,6 +59,22 @@ def callback():
     code = request.args.get("code")
     token_info = sp_oauth.get_access_token(code)
     session["token_info"] = token_info
+
+    # Get user profile and save to database
+    try:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
+        user_profile = sp.current_user()
+
+        user_id = db.get_or_create_user(
+            spotify_id=user_profile["id"],
+            display_name=user_profile.get("display_name"),
+            email=user_profile.get("email"),
+            profile_image=user_profile["images"][0]["url"] if user_profile.get("images") else None
+        )
+        session["user_id"] = user_id
+    except Exception as e:
+        print(f"Error saving user to database: {e}")
+
     return redirect(url_for("dashboard"))
 
 @app.route("/logout")
@@ -76,19 +93,48 @@ def dashboard():
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
 
-  
+    # Get user profile
     user_profile = sp.current_user()
     user_image = user_profile["images"][0]["url"] if user_profile["images"] else None
 
-   
+    # Get filters
     time_range = request.args.get("time_range", "short_term")
     limit = int(request.args.get("limit", 10))
 
+    # Get listening data
     tracks = sp.current_user_top_tracks(limit=limit, time_range=time_range)["items"]
     artists = sp.current_user_top_artists(limit=limit, time_range=time_range)["items"]
 
-   
+    # Save snapshot to database
+    try:
+        user_id = session.get("user_id")
+        if user_id:
+            # Simplified track/artist data for storage
+            tracks_simple = [{
+                'id': t['id'],
+                'name': t['name'],
+                'artist': t['artists'][0]['name'] if t.get('artists') else ''
+            } for t in tracks]
+
+            artists_simple = [{
+                'id': a['id'],
+                'name': a['name']
+            } for a in artists]
+
+            db.save_listening_snapshot(user_id, time_range, tracks_simple, artists_simple)
+    except Exception as e:
+        print(f"Error saving snapshot: {e}")
+
+    # Get recommendations
     recs = get_recommendations(sp, tracks, artists, limit=10)
+
+    # Save recommendations to database
+    try:
+        user_id = session.get("user_id")
+        if user_id and recs:
+            db.save_recommendations(user_id, recs)
+    except Exception as e:
+        print(f"Error saving recommendations: {e}")
 
     return render_template(
         "dashboard.html",
