@@ -1,6 +1,7 @@
 """
 Audio Features Service using RapidAPI Track Analysis
 Workaround for Spotify's deprecated audio features endpoint for new apps.
+Includes intelligent rate limiting and retry logic.
 """
 
 import os
@@ -13,7 +14,7 @@ load_dotenv()
 
 
 class AudioFeaturesService:
-    """Service for fetching Spotify audio features via RapidAPI."""
+    """Service for fetching Spotify audio features via RapidAPI with smart rate limiting."""
 
     def __init__(self):
         """Initialize RapidAPI audio features service."""
@@ -32,19 +33,24 @@ class AudioFeaturesService:
         }
         self.base_url = 'https://track-analysis.p.rapidapi.com/pktx/spotify'
 
-    def get_audio_features(self, track_id: str) -> Optional[Dict]:
+        # Rate limiting settings
+        self.max_retries = 3
+        self.base_retry_delay = 2  # seconds
+
+    def get_audio_features(self, track_id: str, retry_count: int = 0) -> Optional[Dict]:
         """
-        Get audio features for a single track.
+        Get audio features for a single track with retry logic.
 
         Args:
             track_id: Spotify track ID
+            retry_count: Current retry attempt number
 
         Returns:
             Dictionary with audio features or None if error
         """
         try:
             url = f"{self.base_url}/{track_id}"
-            response = requests.get(url, headers=self.headers, timeout=10)
+            response = requests.get(url, headers=self.headers, timeout=15)
             response.raise_for_status()
 
             data = response.json()
@@ -65,41 +71,65 @@ class AudioFeaturesService:
             return features
 
         except requests.exceptions.HTTPError as e:
-            print(f"HTTP error fetching audio features for track {track_id}: {e}")
+            # Handle rate limiting (429) and forbidden (403) errors with retry
+            if e.response.status_code in [429, 403]:
+                if retry_count < self.max_retries:
+                    # Exponential backoff: 2s, 4s, 8s
+                    retry_delay = self.base_retry_delay * (2 ** retry_count)
+                    print(f"Rate limited for track {track_id}. Retrying in {retry_delay}s... (attempt {retry_count + 1}/{self.max_retries})")
+                    time.sleep(retry_delay)
+                    return self.get_audio_features(track_id, retry_count + 1)
+                else:
+                    print(f"Max retries reached for track {track_id} after rate limiting")
+                    return None
+            else:
+                print(f"HTTP {e.response.status_code} error for track {track_id}")
+                return None
+
+        except requests.exceptions.Timeout:
+            if retry_count < self.max_retries:
+                print(f"Timeout for track {track_id}. Retrying...")
+                time.sleep(1)
+                return self.get_audio_features(track_id, retry_count + 1)
             return None
+
         except Exception as e:
             print(f"Error fetching audio features for track {track_id}: {e}")
             return None
 
-    def get_audio_features_batch(self, track_ids: List[str], rate_limit_delay: float = 0.2) -> Dict[str, Dict]:
+    def get_audio_features_batch(self, track_ids: List[str], rate_limit_delay: float = 0.6) -> Dict[str, Dict]:
         """
-        Get audio features for multiple tracks with rate limiting.
+        Get audio features for multiple tracks with conservative rate limiting.
 
         Args:
             track_ids: List of Spotify track IDs
-            rate_limit_delay: Delay between requests in seconds (default 0.2s = 5 req/sec)
+            rate_limit_delay: Delay between requests in seconds (default 0.6s ≈ 1.67 req/sec)
 
         Returns:
             Dictionary mapping track_id to audio features
         """
         results = {}
+        failed_count = 0
 
-        print(f"Fetching audio features for {len(track_ids)} tracks...")
+        print(f"Fetching audio features for {len(track_ids)} tracks (rate limited to ~1.67 req/sec)...")
 
         for i, track_id in enumerate(track_ids):
-            if i > 0 and i % 10 == 0:
-                print(f"Progress: {i}/{len(track_ids)} tracks processed")
+            if i > 0 and i % 5 == 0:
+                print(f"Progress: {i}/{len(track_ids)} tracks processed ({len(results)} successful, {failed_count} failed)")
 
             features = self.get_audio_features(track_id)
 
             if features:
                 results[track_id] = features
+            else:
+                failed_count += 1
 
-            # Rate limiting to avoid hitting API limits
+            # Rate limiting to avoid hitting API limits (conservative 0.6s = ~1.67 req/sec)
             if i < len(track_ids) - 1:
                 time.sleep(rate_limit_delay)
 
-        print(f"Successfully fetched features for {len(results)}/{len(track_ids)} tracks")
+        success_rate = (len(results) / len(track_ids) * 100) if track_ids else 0
+        print(f"Successfully fetched features for {len(results)}/{len(track_ids)} tracks ({success_rate:.1f}% success rate)")
         return results
 
     @staticmethod

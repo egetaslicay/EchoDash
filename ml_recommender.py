@@ -82,45 +82,57 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
     user_track_ids.update([t["id"] for t in top_tracks if "id" in t])
     print(f"Found {len(user_track_ids)} tracks in user's history")
 
-    # 2. Build candidate pool from top artists and related artists
-    print("\nStep 2: Building candidate pool...")
+    # 2. Build candidate pool from top artists (OPTIMIZED: reduced API calls)
+    print("\nStep 2: Building candidate pool (optimized for rate limits)...")
     candidates = []
 
-    for artist in top_artists[:15]:  # Use top 15 artists
+    # REDUCED: Only use top 8 artists (was 15) to minimize Spotify API calls
+    for artist in top_artists[:8]:
         try:
             artist_id = artist["id"]
 
-            # Get top tracks from artist
-            top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:5]
-            for track in top_tracks_artist:
-                if track["id"] not in user_track_ids:
-                    candidates.append({
-                        "id": track["id"],
-                        "name": track["name"],
-                        "artist": artist["name"]
-                    })
+            # Get top tracks from artist (REDUCED: 3 tracks instead of 5)
+            try:
+                top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:3]
+                for track in top_tracks_artist:
+                    if track["id"] not in user_track_ids:
+                        candidates.append({
+                            "id": track["id"],
+                            "name": track["name"],
+                            "artist": artist["name"]
+                        })
+            except Exception as e:
+                print(f"Error fetching tracks for artist {artist.get('name', 'unknown')}: {e}")
+                continue
 
-            # Get related artists
-            related = sp.artist_related_artists(artist_id)["artists"][:3]
-            for rel in related:
-                try:
-                    rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:3]
-                    for track in rel_tracks:
-                        if track["id"] not in user_track_ids:
-                            candidates.append({
-                                "id": track["id"],
-                                "name": track["name"],
-                                "artist": rel["name"]
-                            })
-                except Exception:
-                    continue
+            # Get related artists (REDUCED: 2 related artists instead of 3)
+            try:
+                related = sp.artist_related_artists(artist_id)["artists"][:2]
+                for rel in related:
+                    try:
+                        # REDUCED: 2 tracks per related artist instead of 3
+                        rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:2]
+                        for track in rel_tracks:
+                            if track["id"] not in user_track_ids:
+                                candidates.append({
+                                    "id": track["id"],
+                                    "name": track["name"],
+                                    "artist": rel["name"]
+                                })
+                    except Exception:
+                        continue  # Skip problematic artists (404 errors)
+            except Exception as e:
+                print(f"Error fetching related artists for {artist.get('name', 'unknown')}: {e}")
+                continue
 
         except Exception as e:
             print(f"Error processing artist: {e}")
             continue
 
     # Remove duplicates
-    candidates_df = pd.DataFrame(candidates).drop_duplicates(subset=["id"])
+    candidates_df = pd.DataFrame(candidates)
+    if not candidates_df.empty:
+        candidates_df = candidates_df.drop_duplicates(subset=["id"])
     print(f"Collected {len(candidates_df)} candidate tracks")
 
     if candidates_df.empty:
@@ -136,17 +148,36 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         print("Please set RAPID_API_KEY in .env file")
         return []
 
-    # Get audio features for user's top tracks
-    user_top_track_ids = [t["id"] for t in top_tracks[:20]]  # Use top 20 for analysis
+    # Get audio features for user's top tracks (REDUCED: 15 instead of 20 to save API calls)
+    user_top_track_ids = [t["id"] for t in top_tracks[:15]]
     user_features = audio_service.get_audio_features_batch(user_top_track_ids)
 
-    # Get audio features for candidate tracks
-    candidate_track_ids = candidates_df["id"].tolist()[:200]  # Limit to 200 to avoid excessive API calls
+    # Get audio features for candidate tracks (REDUCED: 50 instead of 200 to avoid rate limits)
+    candidate_track_ids = candidates_df["id"].tolist()[:50]
+    print(f"Fetching audio features for {len(candidate_track_ids)} candidates (reduced for rate limits)...")
     candidate_features = audio_service.get_audio_features_batch(candidate_track_ids)
 
-    if not user_features or not candidate_features:
-        print("Failed to fetch audio features")
+    # Check if we have enough features (need at least 50% success rate to proceed)
+    if not user_features:
+        print("Failed to fetch user audio features")
         return []
+
+    if not candidate_features:
+        print("Failed to fetch candidate audio features")
+        return []
+
+    user_success_rate = len(user_features) / len(user_top_track_ids) * 100
+    candidate_success_rate = len(candidate_features) / len(candidate_track_ids) * 100
+
+    if user_success_rate < 50:
+        print(f"Insufficient user features ({user_success_rate:.1f}% success rate, need ≥50%)")
+        return []
+
+    if candidate_success_rate < 30:
+        print(f"Insufficient candidate features ({candidate_success_rate:.1f}% success rate, need ≥30%)")
+        return []
+
+    print(f"Feature fetch quality: User {user_success_rate:.1f}%, Candidates {candidate_success_rate:.1f}%")
 
     # 4. Build feature matrices with weighted features
     print("\nStep 4: Building weighted feature matrices...")
