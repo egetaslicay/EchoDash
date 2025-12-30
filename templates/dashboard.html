@@ -40,6 +40,24 @@
       letter-spacing: -0.5px;
     }
 
+    .nav-link {
+      color: #2d3748 !important;
+      font-weight: 600;
+      padding: 8px 16px !important;
+      margin: 0 4px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .nav-link.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white !important;
+    }
+
     .profile-section {
       display: flex;
       align-items: center;
@@ -348,16 +366,33 @@
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg sticky-top">
     <div class="container-fluid container-custom">
-      <a class="navbar-brand" href="#">
+      <a class="navbar-brand" href="{{ url_for('dashboard') }}">
         <i class="fas fa-wave-square"></i> EchoDash
       </a>
-      <div class="profile-section">
-        {% if user_image %}
-          <img src="{{ user_image }}" alt="Profile" class="profile-img">
-        {% endif %}
-        <a href="{{ url_for('logout') }}" class="btn-logout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('dashboard') }}">
+              <i class="fas fa-home"></i> Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('analytics') }}">
+              <i class="fas fa-chart-line"></i> Analytics
+            </a>
+          </li>
+        </ul>
+        <div class="profile-section">
+          {% if user_image %}
+            <img src="{{ user_image }}" alt="Profile" class="profile-img">
+          {% endif %}
+          <a href="{{ url_for('logout') }}" class="btn-logout">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </a>
+        </div>
       </div>
     </div>
   </nav>

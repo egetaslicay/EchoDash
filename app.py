@@ -161,5 +161,195 @@ def recommendations():
 
     return render_template("recommendations.html", recs=recs)
 
+
+@app.route("/analytics")
+def analytics():
+    """Analytics page with Plotly visualizations."""
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect(url_for("login"))
+
+    sp = spotipy.Spotify(auth=token_info["access_token"])
+
+    # Get user profile
+    user_profile = sp.current_user()
+    user_image = user_profile["images"][0]["url"] if user_profile["images"] else None
+
+    # Get listening data
+    tracks_short = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
+    artists_short = sp.current_user_top_artists(limit=10, time_range="short_term")["items"]
+
+    # Get audio features for top tracks
+    track_ids = [t['id'] for t in tracks_short]
+    audio_features_raw = sp.audio_features(track_ids)
+    audio_features = [f for f in audio_features_raw if f]  # Filter out None
+
+    # Generate visualizations
+    charts = {}
+
+    # 1. Audio Features Radar Chart
+    charts['audio_features_radar'] = create_audio_features_radar(audio_features)
+
+    # 2. Top Artists Bar Chart
+    charts['top_artists_bar'] = create_top_artists_chart(artists_short[:10])
+
+    # 3. Mood/Energy Scatter Plot
+    charts['mood_scatter'] = create_mood_scatter(tracks_short, audio_features)
+
+    # 4. Audio Feature Distribution
+    charts['feature_distribution'] = create_feature_distribution(audio_features)
+
+    # Convert plots to JSON for embedding in HTML
+    charts_json = {key: json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder)
+                   for key, chart in charts.items()}
+
+    return render_template(
+        "analytics.html",
+        charts=charts_json,
+        user_image=user_image
+    )
+
+
+def create_audio_features_radar(audio_features):
+    """Create radar chart of average audio features."""
+    if not audio_features:
+        return {}
+
+    # Calculate average features
+    features = ['danceability', 'energy', 'speechiness', 'acousticness', 'instrumentalness', 'valence']
+    averages = {}
+
+    for feature in features:
+        values = [f.get(feature, 0) for f in audio_features if f.get(feature) is not None]
+        averages[feature] = np.mean(values) if values else 0
+
+    # Create radar chart
+    fig = go.Figure(data=go.Scatterpolar(
+        r=list(averages.values()),
+        theta=[f.capitalize() for f in features],
+        fill='toself',
+        line=dict(color='#667eea', width=2),
+        fillcolor='rgba(102, 126, 234, 0.3)'
+    ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 1])
+        ),
+        showlegend=False,
+        title="Your Music DNA",
+        font=dict(family="Inter", size=14),
+        height=400
+    )
+
+    return fig
+
+
+def create_top_artists_chart(artists):
+    """Create horizontal bar chart of top artists."""
+    names = [a['name'] for a in artists]
+    # Create ranking scores (10, 9, 8, ...)
+    scores = list(range(len(names), 0, -1))
+
+    fig = go.Figure(data=[
+        go.Bar(
+            y=names[::-1],  # Reverse to show #1 at top
+            x=scores[::-1],
+            orientation='h',
+            marker=dict(
+                color=scores[::-1],
+                colorscale=[[0, '#764ba2'], [1, '#667eea']],
+                showscale=False
+            )
+        )
+    ])
+
+    fig.update_layout(
+        title="Top 10 Artists",
+        xaxis_title="Ranking Score",
+        yaxis_title="",
+        font=dict(family="Inter", size=12),
+        height=500,
+        showlegend=False
+    )
+
+    return fig
+
+
+def create_mood_scatter(tracks, audio_features):
+    """Create scatter plot of energy vs valence (mood quadrants)."""
+    if not audio_features:
+        return {}
+
+    energy = [f.get('energy', 0) for f in audio_features]
+    valence = [f.get('valence', 0) for f in audio_features]
+    track_names = [t['name'][:30] + '...' if len(t['name']) > 30 else t['name']
+                   for t in tracks[:len(audio_features)]]
+
+    fig = go.Figure(data=go.Scatter(
+        x=valence,
+        y=energy,
+        mode='markers',
+        marker=dict(
+            size=12,
+            color=energy,
+            colorscale='Viridis',
+            showscale=True,
+            colorbar=dict(title="Energy")
+        ),
+        text=track_names,
+        hovertemplate='<b>%{text}</b><br>Valence: %{x:.2f}<br>Energy: %{y:.2f}<extra></extra>'
+    ))
+
+    # Add quadrant lines
+    fig.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.5)
+    fig.add_vline(x=0.5, line_dash="dash", line_color="gray", opacity=0.5)
+
+    # Add quadrant labels
+    fig.add_annotation(x=0.75, y=0.75, text="Energetic<br>& Happy", showarrow=False, opacity=0.5)
+    fig.add_annotation(x=0.25, y=0.75, text="Energetic<br>& Dark", showarrow=False, opacity=0.5)
+    fig.add_annotation(x=0.75, y=0.25, text="Calm<br>& Happy", showarrow=False, opacity=0.5)
+    fig.add_annotation(x=0.25, y=0.25, text="Calm<br>& Dark", showarrow=False, opacity=0.5)
+
+    fig.update_layout(
+        title="Mood Map (Energy vs Positivity)",
+        xaxis_title="Valence (Musical Positivity)",
+        yaxis_title="Energy",
+        font=dict(family="Inter", size=12),
+        height=500
+    )
+
+    return fig
+
+
+def create_feature_distribution(audio_features):
+    """Create histogram of tempo distribution."""
+    if not audio_features:
+        return {}
+
+    tempos = [f.get('tempo', 0) for f in audio_features if f.get('tempo')]
+
+    fig = go.Figure(data=[
+        go.Histogram(
+            x=tempos,
+            nbinsx=20,
+            marker=dict(
+                color='#667eea',
+                line=dict(color='white', width=1)
+            )
+        )
+    ])
+
+    fig.update_layout(
+        title="Tempo Distribution (BPM)",
+        xaxis_title="Tempo (BPM)",
+        yaxis_title="Number of Tracks",
+        font=dict(family="Inter", size=12),
+        height=350
+    )
+
+    return fig
+
+
 if __name__ == "__main__":
     app.run(debug=True)
