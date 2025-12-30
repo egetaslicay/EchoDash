@@ -6,4 +6,3 @@ spotipy
 numpy
 pandas
 scikit-learn
-pylast
