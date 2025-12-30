@@ -156,17 +156,17 @@ pip install -r requirements.txt
 
 #### RapidAPI Setup (REQUIRED for ML recommendations)
 
-1. Go to [RapidAPI Track Analysis](https://rapidapi.com/Glavier/api/track-analysis)
+1. Go to [RapidAPI Hub](https://rapidapi.com/hub) and search for "Spotify Audio Features"
 
 2. Sign up for a free account
 
-3. Subscribe to the **free tier** of the Track Analysis API
+3. Subscribe to the **free tier** of a Spotify Audio Features API
 
 4. Copy your **X-RapidAPI-Key** from the API dashboard
 
 
 
-> **Why RapidAPI?** Spotify deprecated their audio features endpoint for new apps in late 2024. RapidAPI's Track Analysis provides the same Spotify audio features data (acousticness, danceability, energy, etc.) that powers our ML recommendation engine.
+> **Why RapidAPI?** Spotify deprecated their audio features endpoint for new apps in late 2024. RapidAPI provides access to Spotify audio features data (acousticness, danceability, energy, etc.) that powers our ML recommendation engine.
 
 
 

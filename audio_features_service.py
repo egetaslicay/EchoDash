@@ -24,14 +24,14 @@ class AudioFeaturesService:
             raise ValueError(
                 "RapidAPI key not found. "
                 "Please set RAPID_API_KEY in .env file. "
-                "Get your key from: https://rapidapi.com/Glavier/api/track-analysis"
+                "Get your key from RapidAPI Hub (search for 'Spotify Audio Features')"
             )
 
         self.headers = {
-            'x-rapidapi-host': 'track-analysis.p.rapidapi.com',
+            'x-rapidapi-host': 'spotify-audio-features-track-analysis.p.rapidapi.com',
             'x-rapidapi-key': self.api_key
         }
-        self.base_url = 'https://track-analysis.p.rapidapi.com/pktx/spotify'
+        self.base_url = 'https://spotify-audio-features-track-analysis.p.rapidapi.com/tracks/spotify_audio_features'
 
         # Rate limiting settings
         self.max_retries = 3
@@ -49,8 +49,9 @@ class AudioFeaturesService:
             Dictionary with audio features or None if error
         """
         try:
-            url = f"{self.base_url}/{track_id}"
-            response = requests.get(url, headers=self.headers, timeout=15)
+            # Use query parameters instead of path parameters
+            params = {'spotify_track_id': track_id}
+            response = requests.get(self.base_url, params=params, headers=self.headers, timeout=15)
             response.raise_for_status()
 
             data = response.json()
