@@ -1,7 +1,6 @@
 """
 ML-based Music Recommendation Engine
-Uses Spotify audio features (acousticness, danceability, energy, etc.)
-with weighted cosine similarity for personalized recommendations.
+Uses Spotify's native audio features API with weighted cosine similarity.
 """
 
 import numpy as np
@@ -9,7 +8,6 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict
-from audio_features_service import get_audio_features_service
 
 
 AUDIO_FEATURE_COLUMNS = [
@@ -139,45 +137,62 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         print("No candidates found")
         return []
 
-    # 3. Fetch audio features
-    print("\nStep 3: Fetching audio features...")
+    # 3. Fetch audio features using Spotify's native API
+    print("\nStep 3: Fetching audio features from Spotify...")
+
+    # Get audio features for user's top tracks
+    user_top_track_ids = [t["id"] for t in top_tracks[:20]]
+    print(f"Fetching features for {len(user_top_track_ids)} user tracks...")
+
     try:
-        audio_service = get_audio_features_service()
-    except ValueError as e:
-        print(f"Audio features service not available: {e}")
-        print("Please set RAPID_API_KEY in .env file")
+        user_features_raw = sp.audio_features(user_top_track_ids)
+        user_features = {}
+        for i, features in enumerate(user_features_raw):
+            if features:  # Skip None results
+                track_id = user_top_track_ids[i]
+                user_features[track_id] = {
+                    'acousticness': features.get('acousticness', 0),
+                    'danceability': features.get('danceability', 0),
+                    'energy': features.get('energy', 0),
+                    'instrumentalness': features.get('instrumentalness', 0),
+                    'loudness': features.get('loudness', 0),
+                    'speechiness': features.get('speechiness', 0),
+                    'tempo': features.get('tempo', 0),
+                    'valence': features.get('valence', 0)
+                }
+    except Exception as e:
+        print(f"Error fetching user audio features: {e}")
         return []
 
-    # Get audio features for user's top tracks (REDUCED: 15 instead of 20 to save API calls)
-    user_top_track_ids = [t["id"] for t in top_tracks[:15]]
-    user_features = audio_service.get_audio_features_batch(user_top_track_ids)
+    # Get audio features for candidate tracks (limit to 100 for performance)
+    candidate_track_ids = candidates_df["id"].tolist()[:100]
+    print(f"Fetching features for {len(candidate_track_ids)} candidate tracks...")
 
-    # Get audio features for candidate tracks (REDUCED: 50 instead of 200 to avoid rate limits)
-    candidate_track_ids = candidates_df["id"].tolist()[:50]
-    print(f"Fetching audio features for {len(candidate_track_ids)} candidates (reduced for rate limits)...")
-    candidate_features = audio_service.get_audio_features_batch(candidate_track_ids)
-
-    # Check if we have enough features (need at least 50% success rate to proceed)
-    if not user_features:
-        print("Failed to fetch user audio features")
+    try:
+        candidate_features_raw = sp.audio_features(candidate_track_ids)
+        candidate_features = {}
+        for i, features in enumerate(candidate_features_raw):
+            if features:  # Skip None results
+                track_id = candidate_track_ids[i]
+                candidate_features[track_id] = {
+                    'acousticness': features.get('acousticness', 0),
+                    'danceability': features.get('danceability', 0),
+                    'energy': features.get('energy', 0),
+                    'instrumentalness': features.get('instrumentalness', 0),
+                    'loudness': features.get('loudness', 0),
+                    'speechiness': features.get('speechiness', 0),
+                    'tempo': features.get('tempo', 0),
+                    'valence': features.get('valence', 0)
+                }
+    except Exception as e:
+        print(f"Error fetching candidate audio features: {e}")
         return []
 
-    if not candidate_features:
-        print("Failed to fetch candidate audio features")
+    if not user_features or not candidate_features:
+        print("Failed to fetch sufficient audio features")
         return []
 
-    user_success_rate = len(user_features) / len(user_top_track_ids) * 100
-    candidate_success_rate = len(candidate_features) / len(candidate_track_ids) * 100
-
-    if user_success_rate < 50:
-        print(f"Insufficient user features ({user_success_rate:.1f}% success rate, need ≥50%)")
-        return []
-
-    if candidate_success_rate < 30:
-        print(f"Insufficient candidate features ({candidate_success_rate:.1f}% success rate, need ≥30%)")
-        return []
-
-    print(f"Feature fetch quality: User {user_success_rate:.1f}%, Candidates {candidate_success_rate:.1f}%")
+    print(f"Successfully fetched features: {len(user_features)} user tracks, {len(candidate_features)} candidates")
 
     # 4. Build feature matrices with weighted features
     print("\nStep 4: Building weighted feature matrices...")

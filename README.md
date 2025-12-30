@@ -68,8 +68,6 @@
 
 - **Spotipy** - Spotify Web API client
 
-- **RapidAPI Track Analysis** - Spotify audio features API
-
 - **scikit-learn** - ML algorithms (StandardScaler, weighted cosine similarity)
 
 - **NumPy & Pandas** - Data processing and feature matrices
@@ -152,22 +150,6 @@ pip install -r requirements.txt
 
 4. Add `http://localhost:5000/callback` to the Redirect URIs
 
- 
-
-#### RapidAPI Setup (REQUIRED for ML recommendations)
-
-1. Go to [RapidAPI Hub](https://rapidapi.com/hub) and search for "Spotify Audio Features"
-
-2. Sign up for a free account
-
-3. Subscribe to the **free tier** of a Spotify Audio Features API
-
-4. Copy your **X-RapidAPI-Key** from the API dashboard
-
-
-
-> **Why RapidAPI?** Spotify deprecated their audio features endpoint for new apps in late 2024. RapidAPI provides access to Spotify audio features data (acousticness, danceability, energy, etc.) that powers our ML recommendation engine.
-
 
 
 #### Environment Configuration
@@ -191,8 +173,6 @@ pip install -r requirements.txt
    SPOTIFY_REDIRECT_URI=http://localhost:5000/callback
 
    FLASK_SECRET_KEY=your_random_secret_key
-
-   RAPID_API_KEY=your_rapidapi_key  # Required for ML recommendations
 
    ```
 
@@ -334,9 +314,7 @@ The dashboard offers a **clean, card-based layout** with:
 
 ### Fallback System
 
-
-
-If RapidAPI is not configured, the system falls back to a **Basic Algorithm** that uses Spotify's related artists API to generate recommendations.
+If ML recommendations fail, the system falls back to a **Basic Algorithm** that uses Spotify's related artists API to generate recommendations.
 
  
 
