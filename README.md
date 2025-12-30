@@ -34,11 +34,9 @@
 
 - **Multi-tier recommendation system**:
 
-  - Primary: ML-based cosine similarity on audio features
+  - Primary: ML-based weighted cosine similarity on audio features
 
-  - Fallback: Last.fm collaborative filtering
-
-  - Basic: Spotify related artists
+  - Fallback: Spotify related artists
 
 - **Visual similarity scores** - See how well each recommendation matches your taste
 
@@ -70,13 +68,11 @@
 
 - **Spotipy** - Spotify Web API client
 
-- **RapidAPI Track Analysis** - Audio features (workaround for Spotify's deprecated endpoint)
+- **RapidAPI Track Analysis** - Spotify audio features API
 
-- **scikit-learn** - ML algorithms (StandardScaler, cosine similarity)
+- **scikit-learn** - ML algorithms (StandardScaler, weighted cosine similarity)
 
-- **Last.fm API** - Collaborative filtering fallback
-
-- **NumPy & Pandas** - Data processing
+- **NumPy & Pandas** - Data processing and feature matrices
 
  
 
@@ -158,7 +154,7 @@ pip install -r requirements.txt
 
  
 
-#### RapidAPI Setup (for audio features - REQUIRED for best recommendations)
+#### RapidAPI Setup (REQUIRED for ML recommendations)
 
 1. Go to [RapidAPI Track Analysis](https://rapidapi.com/Glavier/api/track-analysis)
 
@@ -168,21 +164,11 @@ pip install -r requirements.txt
 
 4. Copy your **X-RapidAPI-Key** from the API dashboard
 
- 
 
-> **Why RapidAPI?** Spotify deprecated their audio features endpoint for new apps in late 2024. RapidAPI's Track Analysis provides the same data (acousticness, danceability, energy, etc.) that powers our ML recommendations.
 
- 
+> **Why RapidAPI?** Spotify deprecated their audio features endpoint for new apps in late 2024. RapidAPI's Track Analysis provides the same Spotify audio features data (acousticness, danceability, energy, etc.) that powers our ML recommendation engine.
 
-#### Last.fm API Setup (optional - fallback recommendations)
 
-1. Go to [Last.fm API Account Creation](https://www.last.fm/api/account/create)
-
-2. Create a new API account
-
-3. Copy your **API Key** and **Shared Secret**
-
- 
 
 #### Environment Configuration
 
@@ -207,10 +193,6 @@ pip install -r requirements.txt
    FLASK_SECRET_KEY=your_random_secret_key
 
    RAPID_API_KEY=your_rapidapi_key  # Required for ML recommendations
-
-   LASTFM_API_KEY=your_lastfm_api_key  # Optional
-
-   LASTFM_API_SECRET=your_lastfm_api_secret  # Optional
 
    ```
 
@@ -334,11 +316,15 @@ The dashboard offers a **clean, card-based layout** with:
 
 4. **ML Processing**:
 
+   - Applies feature weights (danceability, energy, and valence get higher weights)
+
    - Normalizes features using StandardScaler (mean=0, std=1)
 
-   - Calculates cosine similarity between candidate tracks and your top tracks
+   - Calculates weighted cosine similarity between candidate tracks and your top tracks
 
-   - Ranks candidates by similarity score
+   - Combines max similarity (70%) + average similarity (30%) for balanced recommendations
+
+   - Ranks candidates by combined similarity score
 
 5. **Enrichment**: Adds Spotify metadata (album art, preview URLs, artist info)
 
@@ -348,13 +334,9 @@ The dashboard offers a **clean, card-based layout** with:
 
 ### Fallback System
 
- 
 
-If RapidAPI is not configured, the system falls back to:
 
-1. **Last.fm Collaborative Filtering** - Recommendations based on what similar users listen to
-
-2. **Basic Algorithm** - Uses Spotify's related artists API
+If RapidAPI is not configured, the system falls back to a **Basic Algorithm** that uses Spotify's related artists API to generate recommendations.
 
  
 

@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-from lastfm_service import get_lastfm_service
 from ml_recommender import get_recommendations_ml
 
 
@@ -83,10 +82,9 @@ def get_recommendations(sp, top_tracks, top_artists, limit=50):
     Generate up to `limit` fresh recommendations using ML-based audio feature analysis.
 
     Recommendation Strategy (in order of priority):
-    1. ML-based: Uses audio features (acousticness, danceability, energy, etc.)
+    1. ML-based: Uses Spotify audio features (acousticness, danceability, energy, etc.)
        with cosine similarity to find tracks similar to user's taste
-    2. Last.fm: Collaborative filtering based on similar tracks/artists
-    3. Fallback: Basic recommendation using Spotify's related artists
+    2. Fallback: Basic recommendation using Spotify's related artists
 
     Args:
         sp: Spotipy client
@@ -107,159 +105,18 @@ def get_recommendations(sp, top_tracks, top_artists, limit=50):
         print("ML recommendations returned empty, trying fallback...")
     except Exception as e:
         print(f"ML recommender not available: {e}")
-        print("Falling back to Last.fm...")
+        print("Falling back to basic Spotify recommendations...")
 
-    # Try Last.fm collaborative filtering
-    try:
-        lastfm = get_lastfm_service()
-        return _get_recommendations_lastfm(sp, top_tracks, top_artists, limit, lastfm)
-    except ValueError as e:
-        print(f"Last.fm service not available: {e}")
-        # Fallback to basic method if Last.fm is not configured
-        return _get_recommendations_fallback(sp, top_tracks, top_artists, limit)
-
-
-
-def _get_recommendations_lastfm(sp, top_tracks, top_artists, limit, lastfm):
-    """
-    Last.fm-based recommendations using collaborative filtering.
-    """
-    print("Using Last.fm collaborative filtering...")
-
-    # Collect all user's known track IDs
-    user_track_ids = set()
-
-    for rng in ["short_term", "medium_term", "long_term"]:
-        try:
-            history = sp.current_user_top_tracks(limit=50, time_range=rng)["items"]
-            user_track_ids.update([t["id"] for t in history if "id" in t])
-        except Exception:
-            continue
-
-    try:
-        recent = sp.current_user_recently_played(limit=50)["items"]
-        user_track_ids.update([r["track"]["id"] for r in recent if "track" in r and "id" in r["track"]])
-    except Exception:
-        pass
-
-    user_track_ids.update([t["id"] for t in top_tracks if "id" in t])
-
-    # Collect recommendations from Last.fm
-    recommendations = []
-
-    # 1. Get similar tracks for user's top tracks
-    print("Getting similar tracks from Last.fm...")
-    for track in top_tracks[:10]:  # Use top 10 tracks
-        try:
-            track_name = track.get("name", "")
-            artist_name = track["artists"][0]["name"] if track.get("artists") else ""
-
-            if not track_name or not artist_name:
-                continue
-
-            similar_tracks = lastfm.get_similar_tracks(track_name, artist_name, limit=5)
-
-            for similar in similar_tracks:
-                recommendations.append({
-                    "name": similar["name"],
-                    "artist": similar["artist"],
-                    "score": similar["match_score"],
-                    "source": "similar_track"
-                })
-        except Exception as e:
-            print(f"Error getting similar tracks: {e}")
-            continue
-
-    # 2. Get similar artists and their top tracks
-    print("Getting similar artists from Last.fm...")
-    for artist in top_artists[:10]:  # Use top 10 artists
-        try:
-            artist_name = artist.get("name", "")
-            if not artist_name:
-                continue
-
-            # Get similar artists
-            similar_artists = lastfm.get_similar_artists(artist_name, limit=3)
-
-            for similar_artist in similar_artists:
-                # Get top tracks from similar artist
-                top_tracks_artist = lastfm.get_artist_top_tracks(similar_artist["name"], limit=2)
-
-                for track in top_tracks_artist:
-                    recommendations.append({
-                        "name": track["name"],
-                        "artist": track["artist"],
-                        "score": similar_artist["match_score"] * 0.8,  # Slightly lower weight
-                        "source": "similar_artist"
-                    })
-        except Exception as e:
-            print(f"Error getting similar artists: {e}")
-            continue
-
-    # Remove duplicates and sort by score
-    df = pd.DataFrame(recommendations)
-
-    if df.empty:
-        print("No recommendations found from Last.fm")
-        return []
-
-    # Remove duplicate tracks (same name + artist combo)
-    df = df.drop_duplicates(subset=["name", "artist"])
-
-    # Sort by score
-    df = df.sort_values("score", ascending=False)
-
-    # Search tracks on Spotify and enrich with metadata
-    print(f"Searching {len(df)} recommendations on Spotify...")
-    result = []
-    seen_spotify_ids = set()
-
-    for _, row in df.iterrows():
-        try:
-            # Search for track on Spotify
-            query = f"track:{row['name']} artist:{row['artist']}"
-            search_results = sp.search(q=query, type='track', limit=1)
-
-            if not search_results['tracks']['items']:
-                continue
-
-            track_data = search_results['tracks']['items'][0]
-            track_id = track_data['id']
-
-            # Skip if already in user's library or already added
-            if track_id in user_track_ids or track_id in seen_spotify_ids:
-                continue
-
-            seen_spotify_ids.add(track_id)
-
-            result.append({
-                "id": track_id,
-                "name": track_data["name"],
-                "artist": track_data["artists"][0]["name"],
-                "score": float(row["score"]),
-                "album_image": track_data["album"]["images"][0]["url"] if track_data["album"]["images"] else None,
-                "preview_url": track_data.get("preview_url"),
-                "source": row["source"]
-            })
-
-            # Stop when we have enough recommendations
-            if len(result) >= limit:
-                break
-
-        except Exception as e:
-            print(f"Error enriching track '{row['name']}': {e}")
-            continue
-
-    print(f"Found {len(result)} unique recommendations")
-    return result
+    # Fallback to basic Spotify method
+    return _get_recommendations_fallback(sp, top_tracks, top_artists, limit)
 
 
 def _get_recommendations_fallback(sp, top_tracks, top_artists, limit=50):
     """
-    Fallback recommendation method using the old approach.
-    Used when Last.fm API is not configured.
+    Fallback recommendation method using Spotify's related artists.
+    Used when ML-based recommendations are unavailable.
     """
-    print("Using fallback recommendation method (Last.fm not configured)")
+    print("Using fallback recommendation method (basic Spotify related artists)")
 
     user_track_ids = set()
 

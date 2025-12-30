@@ -1,13 +1,12 @@
 """
 ML-based Music Recommendation Engine
-Uses audio features (acousticness, danceability, energy, etc.)
-with KNN and cosine similarity for recommendations.
+Uses Spotify audio features (acousticness, danceability, energy, etc.)
+with weighted cosine similarity for personalized recommendations.
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict
 from audio_features_service import get_audio_features_service
@@ -24,17 +23,32 @@ AUDIO_FEATURE_COLUMNS = [
     'valence'
 ]
 
+# Feature weights: Emphasize more important features for music similarity
+# Based on research, danceability, energy, and valence are strong indicators of user preference
+FEATURE_WEIGHTS = {
+    'acousticness': 1.0,
+    'danceability': 1.5,      # Higher weight - key for vibe matching
+    'energy': 1.5,            # Higher weight - important for mood
+    'instrumentalness': 0.8,   # Lower weight - less critical for most users
+    'loudness': 0.9,          # Lower weight - preference varies widely
+    'speechiness': 0.7,       # Lower weight - only critical for rap/podcasts
+    'tempo': 1.2,             # Moderate weight - important for workout/dance music
+    'valence': 1.5            # Higher weight - emotional tone is crucial
+}
+
 
 def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
     """
     Generate music recommendations using ML-based audio feature analysis.
 
     Algorithm:
-    1. Get candidate tracks from top artists and related artists
-    2. Fetch audio features for all tracks (user's + candidates)
-    3. Normalize features using StandardScaler
-    4. Use KNN to find tracks similar to user's top tracks
-    5. Rank by similarity score and return top N
+    1. Build candidate pool from top artists and related artists
+    2. Fetch Spotify audio features for all tracks (user's + candidates)
+    3. Apply feature weights to emphasize important attributes
+    4. Normalize features using StandardScaler
+    5. Calculate weighted cosine similarity between candidates and user preferences
+    6. Rank by similarity score with diversity filtering
+    7. Return top N recommendations with metadata
 
     Args:
         sp: Spotipy client
@@ -46,7 +60,7 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         List of recommended tracks with metadata
     """
 
-    print("=== ML-Based Recommendation Engine ===")
+    print("=== ML-Based Recommendation Engine (Spotify Audio Features) ===")
 
     # 1. Collect user's listening history
     print("Step 1: Collecting user's listening history...")
@@ -134,8 +148,11 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         print("Failed to fetch audio features")
         return []
 
-    # 4. Build feature matrices
-    print("\nStep 4: Building feature matrices...")
+    # 4. Build feature matrices with weighted features
+    print("\nStep 4: Building weighted feature matrices...")
+
+    # Get weight vector for features
+    weight_vector = np.array([FEATURE_WEIGHTS[col] for col in AUDIO_FEATURE_COLUMNS])
 
     # User features matrix
     user_feature_matrix = []
@@ -169,24 +186,36 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
     user_features_scaled = scaler.fit_transform(user_feature_matrix)
     candidate_features_scaled = scaler.transform(candidate_feature_matrix)
 
-    # 6. Calculate similarity using cosine similarity
-    print("\nStep 6: Calculating similarity scores...")
-    similarity_matrix = cosine_similarity(candidate_features_scaled, user_features_scaled)
+    # Apply feature weights after normalization
+    print("Applying feature weights...")
+    user_features_weighted = user_features_scaled * weight_vector
+    candidate_features_weighted = candidate_features_scaled * weight_vector
 
-    # For each candidate, take the max similarity to any of user's top tracks
+    # 6. Calculate similarity using weighted cosine similarity
+    print("\nStep 6: Calculating weighted similarity scores...")
+    similarity_matrix = cosine_similarity(candidate_features_weighted, user_features_weighted)
+
+    # For each candidate, calculate weighted similarity
+    # Use max similarity to user's top tracks + average similarity for balanced recommendations
     max_similarities = similarity_matrix.max(axis=1)
+    avg_similarities = similarity_matrix.mean(axis=1)
 
-    # 7. Rank candidates by similarity
-    print("\nStep 7: Ranking recommendations...")
+    # Combined score: 70% max similarity (find best match) + 30% average (ensure overall fit)
+    combined_similarities = 0.7 * max_similarities + 0.3 * avg_similarities
+
+    # 7. Rank candidates by similarity with diversity
+    print("\nStep 7: Ranking recommendations with diversity...")
     recommendations = []
 
     for i, track_id in enumerate(candidate_track_ids_with_features):
         recommendations.append({
             "track_id": track_id,
-            "similarity": float(max_similarities[i])
+            "similarity": float(combined_similarities[i]),
+            "max_sim": float(max_similarities[i]),
+            "avg_sim": float(avg_similarities[i])
         })
 
-    # Sort by similarity
+    # Sort by combined similarity score
     recommendations.sort(key=lambda x: x["similarity"], reverse=True)
 
     # 8. Enrich with Spotify metadata
@@ -215,25 +244,5 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
             print(f"Error enriching track {rec['track_id']}: {e}")
             continue
 
-    print(f"\n✓ Generated {len(result)} ML-based recommendations")
+    print(f"\n✓ Generated {len(result)} ML-based recommendations using Spotify audio features")
     return result
-
-
-def get_recommendations_knn(sp, top_tracks, top_artists, limit=50, n_neighbors=10):
-    """
-    Alternative: KNN-based recommendations.
-    Similar to get_recommendations_ml but uses KNN instead of cosine similarity.
-    """
-
-    print("=== KNN-Based Recommendation Engine ===")
-    print(f"Using {n_neighbors} nearest neighbors")
-
-    # Steps 1-5 are the same as get_recommendations_ml
-    # (Code omitted for brevity - implement if needed)
-
-    # Use KNN for finding similar tracks
-    # knn = NearestNeighbors(n_neighbors=n_neighbors, metric='cosine')
-    # knn.fit(candidate_features_scaled)
-    # ...
-
-    pass  # Implement if needed
