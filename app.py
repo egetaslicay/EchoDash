@@ -177,71 +177,71 @@ def recommendations():
 
 @app.route("/analytics")
 def analytics():
-    """Analytics page with Plotly visualizations."""
+    """Analytics page - rebuilt from scratch."""
     token_info = session.get("token_info", None)
     if not token_info:
         return redirect(url_for("login"))
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
-
-    # Get user profile
     user_profile = sp.current_user()
     user_image = user_profile["images"][0]["url"] if user_profile["images"] else None
 
-    # Get listening data
+    # Get data
     try:
-        tracks_short = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
-        artists_short = sp.current_user_top_artists(limit=20, time_range="short_term")["items"]
-    except Exception as e:
-        print(f"Error fetching Spotify data: {e}")
-        tracks_short = []
-        artists_short = []
+        artists = sp.current_user_top_artists(limit=20, time_range="short_term")["items"]
+        tracks = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
+    except:
+        artists, tracks = [], []
 
-    # Generate visualizations (without deprecated audio features API)
-    charts = {}
-
-    try:
-        # 1. Top Artists Bar Chart
-        if artists_short:
-            charts['top_artists_bar'] = create_top_artists_chart(artists_short[:10])
-    except Exception as e:
-        print(f"Error creating top artists chart: {e}")
-
-    try:
-        # 2. Genre Distribution Pie Chart
-        if artists_short:
-            charts['genre_distribution'] = create_genre_distribution(artists_short)
-    except Exception as e:
-        print(f"Error creating genre distribution chart: {e}")
-
-    try:
-        # 3. Artist Popularity Chart
-        if artists_short:
-            charts['artist_popularity'] = create_artist_popularity_chart(artists_short[:15])
-    except Exception as e:
-        print(f"Error creating artist popularity chart: {e}")
-
-    try:
-        # 4. Track Popularity Chart
-        if tracks_short:
-            charts['track_popularity'] = create_track_popularity_chart(tracks_short)
-    except Exception as e:
-        print(f"Error creating track popularity chart: {e}")
-
-    # Convert plots to JSON for embedding in HTML
     charts_json = {}
-    for key, chart in charts.items():
-        try:
-            charts_json[key] = json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder)
-        except Exception as e:
-            print(f"Error encoding chart {key}: {e}")
-            charts_json[key] = '{}'
 
-    return render_template(
-        "analytics.html",
-        charts=charts_json,
-        user_image=user_image
-    )
+    # Chart 1: Top Artists (horizontal bar)
+    names = [a.get('name', 'Unknown')[:20] for a in artists[:10]]
+    charts_json['top_artists_bar'] = json.dumps({
+        'data': [{'type': 'bar', 'y': names[::-1], 'x': list(range(10, 0, -1)), 'orientation': 'h', 'marker': {'color': '#667eea'}}],
+        'layout': {'title': 'Top 10 Artists', 'height': 400, 'margin': {'l': 150}}
+    })
+
+    # Chart 2: Genres (bar chart)
+    genre_counts = {}
+    for a in artists:
+        for g in a.get('genres', []):
+            genre_counts[g] = genre_counts.get(g, 0) + 1
+
+    if genre_counts:
+        top_g = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+        charts_json['genre_distribution'] = json.dumps({
+            'data': [{'type': 'bar', 'x': [g[0] for g in top_g], 'y': [g[1] for g in top_g], 'marker': {'color': '#764ba2'}}],
+            'layout': {'title': 'Top Genres', 'height': 400, 'xaxis': {'tickangle': -45}}
+        })
+    else:
+        charts_json['genre_distribution'] = json.dumps({
+            'data': [],
+            'layout': {'title': 'Top Genres', 'height': 400, 'annotations': [{'text': 'No genre data', 'showarrow': False, 'font': {'size': 16}}]}
+        })
+
+    # Chart 3: Artist Popularity (line)
+    if artists:
+        pop_vals = [a.get('popularity', 0) for a in artists[:15]]
+        charts_json['artist_popularity'] = json.dumps({
+            'data': [{'type': 'scatter', 'y': pop_vals, 'mode': 'markers+lines', 'marker': {'size': 10, 'color': '#4facfe'}, 'line': {'color': '#667eea'}}],
+            'layout': {'title': 'Artist Popularity Trend', 'height': 400, 'yaxis': {'range': [0, 100]}}
+        })
+    else:
+        charts_json['artist_popularity'] = json.dumps({'data': [], 'layout': {'title': 'Artist Popularity', 'height': 400}})
+
+    # Chart 4: Track Popularity (bar)
+    if tracks:
+        t_names = [t.get('name', 'Unknown')[:20] for t in tracks[:10]]
+        t_pop = [t.get('popularity', 0) for t in tracks[:10]]
+        charts_json['track_popularity'] = json.dumps({
+            'data': [{'type': 'bar', 'x': t_names, 'y': t_pop, 'marker': {'color': '#43e97b'}}],
+            'layout': {'title': 'Top 10 Track Popularity', 'height': 400, 'xaxis': {'tickangle': -45}}
+        })
+    else:
+        charts_json['track_popularity'] = json.dumps({'data': [], 'layout': {'title': 'Track Popularity', 'height': 400}})
+
+    return render_template("analytics.html", charts=charts_json, user_image=user_image)
 
 
 @app.route("/api/feedback", methods=["POST"])
@@ -318,159 +318,6 @@ def get_all_feedback():
     except Exception as e:
         print(f"Error getting feedback: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
-
-def create_top_artists_chart(artists):
-    """Create horizontal bar chart of top artists."""
-    if not artists or len(artists) == 0:
-        # Return empty figure with message
-        fig = go.Figure()
-        fig.update_layout(
-            title="Top Artists",
-            height=400,
-            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
-        )
-        return fig
-
-    # Limit to top 10
-    artists = artists[:10]
-    names = [a.get('name', 'Unknown') for a in artists]
-    scores = list(range(len(names), 0, -1))
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=names[::-1],
-        x=scores[::-1],
-        orientation='h',
-        marker_color='#667eea'
-    ))
-
-    fig.update_layout(
-        title="Top 10 Artists",
-        height=400,
-        showlegend=False,
-        margin=dict(l=150, r=20, t=40, b=40)
-    )
-
-    return fig
-
-
-def create_genre_distribution(artists):
-    """Create bar chart of genre distribution."""
-    if not artists:
-        fig = go.Figure()
-        fig.update_layout(
-            title="Top Genres",
-            height=400,
-            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
-        )
-        return fig
-
-    # Extract genres
-    genre_counts = {}
-    for artist in artists:
-        for genre in artist.get('genres', []):
-            genre_counts[genre] = genre_counts.get(genre, 0) + 1
-
-    if not genre_counts:
-        fig = go.Figure()
-        fig.update_layout(
-            title="Top Genres",
-            height=400,
-            annotations=[dict(text="No genre data available", showarrow=False, font=dict(size=16, color="gray"))]
-        )
-        return fig
-
-    # Top 8 genres
-    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:8]
-    genres = [g[0] for g in sorted_genres]
-    counts = [g[1] for g in sorted_genres]
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=genres,
-        y=counts,
-        marker_color='#764ba2'
-    ))
-
-    fig.update_layout(
-        title="Top Genres in Your Music",
-        height=400,
-        showlegend=False,
-        xaxis_tickangle=-45
-    )
-
-    return fig
-
-
-def create_artist_popularity_chart(artists):
-    """Create simple scatter plot of artist popularity."""
-    if not artists:
-        fig = go.Figure()
-        fig.update_layout(
-            title="Artist Popularity",
-            height=400,
-            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
-        )
-        return fig
-
-    names = [a.get('name', 'Unknown')[:15] for a in artists]
-    popularity = [a.get('popularity', 0) for a in artists]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=list(range(1, len(names) + 1)),
-        y=popularity,
-        mode='markers+lines',
-        marker=dict(size=10, color='#4facfe'),
-        line=dict(color='#667eea', width=2),
-        text=names,
-        hovertemplate='%{text}<br>Popularity: %{y}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        title="Artist Popularity Trend",
-        xaxis_title="Rank",
-        yaxis_title="Popularity (0-100)",
-        height=400,
-        showlegend=False
-    )
-
-    return fig
-
-
-def create_track_popularity_chart(tracks):
-    """Create simple bar chart of track popularity."""
-    if not tracks:
-        fig = go.Figure()
-        fig.update_layout(
-            title="Track Popularity",
-            height=400,
-            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
-        )
-        return fig
-
-    # Limit to top 10 for readability
-    tracks = tracks[:10]
-    names = [t.get('name', 'Unknown')[:20] for t in tracks]
-    popularity = [t.get('popularity', 0) for t in tracks]
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=names,
-        y=popularity,
-        marker_color='#43e97b'
-    ))
-
-    fig.update_layout(
-        title="Top 10 Track Popularity",
-        height=400,
-        showlegend=False,
-        xaxis_tickangle=-45,
-        yaxis_range=[0, 100]
-    )
-
-    return fig
 
 
 if __name__ == "__main__":
