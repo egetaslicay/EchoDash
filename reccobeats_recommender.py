@@ -93,13 +93,26 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
                 print(f"       Response: {response.text[:200]}")
                 continue
 
-            recommendations = response.json()
+            response_data = response.json()
 
-            if not isinstance(recommendations, list):
-                print(f"    ❌ Unexpected response format: {type(recommendations)}")
+            # ReccoBeats returns {"content": [...]} format
+            if isinstance(response_data, dict):
+                recommendations = response_data.get('content', [])
+                if not recommendations:
+                    print(f"    ❌ No 'content' in response or empty. Keys: {list(response_data.keys())}")
+                    continue
+            elif isinstance(response_data, list):
+                # Fallback if API returns array directly
+                recommendations = response_data
+            else:
+                print(f"    ❌ Unexpected response format: {type(response_data)}")
                 continue
 
             print(f"    ✓ Retrieved {len(recommendations)} recommendations from ReccoBeats")
+
+            # Debug: Show first track structure
+            if recommendations and len(recommendations) > 0:
+                print(f"    Sample track keys: {list(recommendations[0].keys())[:10]}")
 
             # Process each recommended track
             for rec_track in recommendations:
