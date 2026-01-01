@@ -87,18 +87,19 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
 
     print(f"User enjoys {len(user_genres)} genres: {', '.join(list(user_genres.keys())[:5])}...")
 
-    # 3. Build candidate pool from related artists
+    # 3. Build candidate pool from related artists (MASSIVELY EXPANDED)
     print("\nStep 3: Building candidate pool from related artists...")
     candidates = []
     filtered_count = 0
 
-    for artist in top_artists[:10]:
+    # Process MORE artists (20 instead of 10)
+    for artist in top_artists[:20]:
         try:
             artist_id = artist["id"]
 
-            # Get top tracks from artist
+            # Get MORE tracks from artist (10 instead of 3)
             try:
-                top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:3]
+                top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:10]
                 for track in top_tracks_artist:
                     track_id = track["id"]
                     # Exclude tracks already in user's library, liked, disliked, or recently recommended
@@ -120,12 +121,13 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                 print(f"  Error fetching tracks for {artist.get('name', 'unknown')}: {e}")
                 continue
 
-            # Get related artists
+            # Get MORE related artists (10 instead of 3)
             try:
-                related = sp.artist_related_artists(artist_id)["artists"][:3]
+                related = sp.artist_related_artists(artist_id)["artists"][:10]
                 for rel in related:
                     try:
-                        rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:2]
+                        # Get MORE tracks per related artist (5 instead of 2)
+                        rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:5]
                         for track in rel_tracks:
                             track_id = track["id"]
                             # Exclude tracks already in user's library, liked, disliked, or recently recommended
@@ -203,25 +205,34 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
             score += 0.25
             print(f"  ⭐ Boosted {track['name']} - artist match with liked tracks")
 
-        # Add small random factor for diversity (±5%)
-        random_factor = random.uniform(-0.05, 0.05)
+        # Add HEAVY random factor for diversity (±25% instead of ±5%)
+        random_factor = random.uniform(-0.25, 0.25)
         score += random_factor
 
         scores.append(score)
 
     candidates_df["score"] = scores
 
-    # 5. Rank and filter for diversity
-    print("\nStep 5: Ranking and filtering for diversity...")
-    recommendations = []
-    seen_artists = set()
-    max_per_artist = 2
-    artist_counts = {}
+    # 5. Rank and filter for diversity WITH HEAVY RANDOMIZATION
+    print("\nStep 5: Ranking with heavy randomization...")
 
     # Sort by score
     candidates_df = candidates_df.sort_values("score", ascending=False)
 
-    for _, track in candidates_df.iterrows():
+    # Take top candidates (5x the limit) and RANDOMLY SAMPLE from them
+    top_pool_size = min(len(candidates_df), limit * 5)
+    top_candidates = candidates_df.head(top_pool_size)
+
+    # Shuffle the top pool to add randomness
+    top_candidates = top_candidates.sample(frac=1.0).reset_index(drop=True)
+
+    print(f"  Selected top {top_pool_size} candidates, now randomly sampling with diversity...")
+
+    recommendations = []
+    artist_counts = {}
+    max_per_artist = 2
+
+    for _, track in top_candidates.iterrows():
         artist_id = track["artist_id"]
 
         # Diversity filter: limit tracks per artist
@@ -243,5 +254,5 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
         if len(recommendations) >= limit:
             break
 
-    print(f"\n✓ Generated {len(recommendations)} recommendations")
+    print(f"\n✓ Generated {len(recommendations)} recommendations from pool of {len(candidates_df)} candidates")
     return recommendations
