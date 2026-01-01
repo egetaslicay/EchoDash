@@ -40,17 +40,25 @@ def calculate_audio_feature_similarity(user_features, track_features):
 def get_spotify_recommendations(sp, seed_track_ids, seed_artist_ids, limit=50):
     """
     Get recommendations from Spotify's API using seed tracks and artists.
+    Uses randomized seeds for variety.
     """
     recommendations = []
 
     try:
-        # Use up to 5 seeds (Spotify's limit)
-        # Prefer track seeds over artist seeds for better quality
-        tracks_to_use = seed_track_ids[:3]  # 3 track seeds
-        artists_to_use = seed_artist_ids[:2]  # 2 artist seeds
+        # RANDOMIZE seeds every time for variety!
+        # Use different seeds on each request
+        import time
+        random.seed(time.time())  # Use current time for true randomness
+
+        available_tracks = seed_track_ids[:20]  # Use top 20 tracks
+        available_artists = seed_artist_ids[:20]  # Use top 20 artists
+
+        # Randomly select 3 tracks and 2 artists
+        tracks_to_use = random.sample(available_tracks, min(3, len(available_tracks)))
+        artists_to_use = random.sample(available_artists, min(2, len(available_artists)))
 
         print(f"    Calling Spotify recommendations API...")
-        print(f"      Using {len(tracks_to_use)} track seeds, {len(artists_to_use)} artist seeds")
+        print(f"      Using {len(tracks_to_use)} random track seeds, {len(artists_to_use)} random artist seeds")
 
         response = sp.recommendations(
             seed_tracks=tracks_to_use,
@@ -80,17 +88,22 @@ def get_spotify_recommendations(sp, seed_track_ids, seed_artist_ids, limit=50):
     return recommendations
 
 
-def get_reccobeats_recommendations(seed_track_ids, limit=30):
+def get_reccobeats_recommendations(seed_track_ids, limit=30, batch_num=0):
     """
     Get recommendations from ReccoBeats API.
+    Uses randomized seeds for variety.
     """
     recommendations = []
 
     try:
-        # Use 5 random seeds
-        seeds_to_use = random.sample(seed_track_ids, min(5, len(seed_track_ids)))
+        # RANDOMIZE seeds every time for variety!
+        import time
+        random.seed(time.time() + batch_num)  # Use time + batch for unique seeds
 
-        print(f"    Calling ReccoBeats API...")
+        available_tracks = seed_track_ids[:30]  # Use top 30 tracks
+        seeds_to_use = random.sample(available_tracks, min(5, len(available_tracks)))
+
+        print(f"    Calling ReccoBeats API (batch {batch_num + 1})...")
         url = "https://api.reccobeats.com/v1/track/recommendation"
         params = [('seeds', seed_id) for seed_id in seeds_to_use]
         params.append(('size', limit))
@@ -176,25 +189,27 @@ def get_recommendations_hybrid(sp, top_tracks, top_artists, limit=50, user_id=No
     except Exception as e:
         print(f"  ⚠️ Could not get Spotify audio features: {e}")
 
-    # 3. Get recommendations from BOTH sources
+    # 3. Get recommendations from BOTH sources (MORE ReccoBeats, LESS Spotify)
     print("\nStep 3: Fetching recommendations from multiple sources...")
 
     all_recommendations = []
     seen_ids = set()
 
-    # Try Spotify first (usually better quality)
-    spotify_recs = get_spotify_recommendations(sp, seed_track_ids, seed_artist_ids, limit=40)
+    # Get LESS from Spotify (20 tracks) - reduces Spotify bias
+    spotify_recs = get_spotify_recommendations(sp, seed_track_ids, seed_artist_ids, limit=20)
     for rec in spotify_recs:
         if rec['id'] not in seen_ids:
             all_recommendations.append(rec)
             seen_ids.add(rec['id'])
 
-    # Add ReccoBeats for variety
-    recco_recs = get_reccobeats_recommendations(seed_track_ids, limit=30)
-    for rec in recco_recs:
-        if rec['id'] not in seen_ids:
-            all_recommendations.append(rec)
-            seen_ids.add(rec['id'])
+    # Get MORE from ReccoBeats with MULTIPLE batches (60+ tracks total)
+    # Each batch uses different random seeds for MAXIMUM variety
+    for batch in range(3):  # 3 batches
+        recco_recs = get_reccobeats_recommendations(seed_track_ids, limit=25, batch_num=batch)
+        for rec in recco_recs:
+            if rec['id'] not in seen_ids:
+                all_recommendations.append(rec)
+                seen_ids.add(rec['id'])
 
     print(f"\n  Total candidates: {len(all_recommendations)}")
 
@@ -271,12 +286,12 @@ def get_recommendations_hybrid(sp, top_tracks, top_artists, limit=50, user_id=No
             # POPULARITY (5% weight)
             score += 0.05 * (track.get('popularity', 0) / 100.0)
 
-            # SOURCE BONUS (5% weight) - Prefer Spotify recommendations
+            # SOURCE BONUS (2% weight) - Small preference for quality sources
             if rec.get('source') == 'Spotify API':
-                score += 0.05
+                score += 0.02
 
-            # Add small randomization
-            score += random.uniform(-0.02, 0.02)
+            # Add LARGER randomization for more variety
+            score += random.uniform(-0.08, 0.08)
 
             enriched_recommendations.append({
                 'id': track_id,
