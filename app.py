@@ -129,6 +129,16 @@ def dashboard():
     user_id = session.get("user_id")
     recs = get_recommendations(sp, tracks, artists, limit=10, user_id=user_id)
 
+    # Get user's liked and disliked tracks for display
+    liked_tracks = []
+    disliked_tracks = []
+    if user_id:
+        try:
+            liked_tracks = db.get_liked_tracks(user_id)
+            disliked_tracks = db.get_disliked_tracks(user_id)
+        except Exception as e:
+            print(f"Error fetching user feedback: {e}")
+
     # Save recommendations to database
     try:
         if user_id and recs:
@@ -141,6 +151,8 @@ def dashboard():
         tracks=tracks,
         artists=artists,
         recs=recs,
+        liked_tracks=liked_tracks,
+        disliked_tracks=disliked_tracks,
         time_range=time_range,
         limit=limit,
         user_image=user_image
@@ -310,148 +322,151 @@ def get_all_feedback():
 
 def create_top_artists_chart(artists):
     """Create horizontal bar chart of top artists."""
-    names = [a['name'] for a in artists]
-    # Create ranking scores (10, 9, 8, ...)
+    if not artists or len(artists) == 0:
+        # Return empty figure with message
+        fig = go.Figure()
+        fig.update_layout(
+            title="Top Artists",
+            height=400,
+            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
+        )
+        return fig
+
+    # Limit to top 10
+    artists = artists[:10]
+    names = [a.get('name', 'Unknown') for a in artists]
     scores = list(range(len(names), 0, -1))
 
-    fig = go.Figure(data=[
-        go.Bar(
-            y=names[::-1],  # Reverse to show #1 at top
-            x=scores[::-1],
-            orientation='h',
-            marker=dict(
-                color=scores[::-1],
-                colorscale=[[0, '#764ba2'], [1, '#667eea']],
-                showscale=False
-            )
-        )
-    ])
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=names[::-1],
+        x=scores[::-1],
+        orientation='h',
+        marker_color='#667eea'
+    ))
 
     fig.update_layout(
         title="Top 10 Artists",
-        xaxis_title="Ranking Score",
-        yaxis_title="",
-        font=dict(family="Inter", size=12),
-        height=500,
-        showlegend=False
+        height=400,
+        showlegend=False,
+        margin=dict(l=150, r=20, t=40, b=40)
     )
 
     return fig
 
 
 def create_genre_distribution(artists):
-    """Create pie chart of genre distribution."""
-    # Extract all genres from artists
+    """Create bar chart of genre distribution."""
+    if not artists:
+        fig = go.Figure()
+        fig.update_layout(
+            title="Top Genres",
+            height=400,
+            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
+        )
+        return fig
+
+    # Extract genres
     genre_counts = {}
     for artist in artists:
         for genre in artist.get('genres', []):
             genre_counts[genre] = genre_counts.get(genre, 0) + 1
 
     if not genre_counts:
-        # Return placeholder chart if no genres
         fig = go.Figure()
-        fig.add_annotation(
-            text="No genre data available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=16, color="gray")
-        )
         fig.update_layout(
-            title="Top Genres in Your Taste",
-            font=dict(family="Inter", size=12),
+            title="Top Genres",
             height=400,
-            xaxis=dict(visible=False),
-            yaxis=dict(visible=False)
+            annotations=[dict(text="No genre data available", showarrow=False, font=dict(size=16, color="gray"))]
         )
         return fig
 
-    # Get top 10 genres
-    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    genres, counts = zip(*sorted_genres) if sorted_genres else ([], [])
+    # Top 8 genres
+    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+    genres = [g[0] for g in sorted_genres]
+    counts = [g[1] for g in sorted_genres]
 
-    fig = go.Figure(data=[
-        go.Pie(
-            labels=genres,
-            values=counts,
-            marker=dict(
-                colors=['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b',
-                        '#fa709a', '#fee140', '#30cfd0', '#c471ed', '#f38181']
-            ),
-            textinfo='label+percent',
-            hovertemplate='<b>%{label}</b><br>%{value} artists<br>%{percent}<extra></extra>'
-        )
-    ])
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=genres,
+        y=counts,
+        marker_color='#764ba2'
+    ))
 
     fig.update_layout(
-        title="Top Genres in Your Taste",
-        font=dict(family="Inter", size=12),
-        height=400
-    )
-
-    return fig
-
-
-def create_artist_popularity_chart(artists):
-    """Create bar chart showing artist popularity scores."""
-    names = [a['name'] for a in artists]
-    popularity = [a.get('popularity', 0) for a in artists]
-
-    fig = go.Figure(data=[
-        go.Bar(
-            x=names,
-            y=popularity,
-            marker=dict(
-                color=popularity,
-                colorscale=[[0, '#764ba2'], [0.5, '#667eea'], [1, '#43e97b']],
-                showscale=False
-            )
-        )
-    ])
-
-    fig.update_layout(
-        title="Artist Popularity Scores",
-        xaxis_title="Artist",
-        yaxis_title="Popularity (0-100)",
-        font=dict(family="Inter", size=12),
-        height=450,
+        title="Top Genres in Your Music",
+        height=400,
+        showlegend=False,
         xaxis_tickangle=-45
     )
 
     return fig
 
 
-def create_track_popularity_chart(tracks):
-    """Create scatter plot of track popularity."""
-    track_names = [t['name'][:25] + '...' if len(t['name']) > 25 else t['name']
-                   for t in tracks]
-    popularity = [t.get('popularity', 0) for t in tracks]
-
-    # Color by popularity
-    colors = ['#43e97b' if p >= 70 else '#667eea' if p >= 40 else '#764ba2'
-              for p in popularity]
-
-    fig = go.Figure(data=[
-        go.Scatter(
-            x=list(range(1, len(tracks) + 1)),
-            y=popularity,
-            mode='markers+lines',
-            marker=dict(
-                size=10,
-                color=colors,
-                line=dict(width=1, color='white')
-            ),
-            line=dict(color='rgba(102, 126, 234, 0.3)', width=2),
-            text=track_names,
-            hovertemplate='<b>%{text}</b><br>Rank: #%{x}<br>Popularity: %{y}<extra></extra>'
+def create_artist_popularity_chart(artists):
+    """Create simple scatter plot of artist popularity."""
+    if not artists:
+        fig = go.Figure()
+        fig.update_layout(
+            title="Artist Popularity",
+            height=400,
+            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
         )
-    ])
+        return fig
+
+    names = [a.get('name', 'Unknown')[:15] for a in artists]
+    popularity = [a.get('popularity', 0) for a in artists]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=list(range(1, len(names) + 1)),
+        y=popularity,
+        mode='markers+lines',
+        marker=dict(size=10, color='#4facfe'),
+        line=dict(color='#667eea', width=2),
+        text=names,
+        hovertemplate='%{text}<br>Popularity: %{y}<extra></extra>'
+    ))
 
     fig.update_layout(
-        title="Track Popularity (Your Top 20)",
+        title="Artist Popularity Trend",
         xaxis_title="Rank",
-        yaxis_title="Popularity Score",
-        font=dict(family="Inter", size=12),
+        yaxis_title="Popularity (0-100)",
         height=400,
+        showlegend=False
+    )
+
+    return fig
+
+
+def create_track_popularity_chart(tracks):
+    """Create simple bar chart of track popularity."""
+    if not tracks:
+        fig = go.Figure()
+        fig.update_layout(
+            title="Track Popularity",
+            height=400,
+            annotations=[dict(text="No data available", showarrow=False, font=dict(size=16, color="gray"))]
+        )
+        return fig
+
+    # Limit to top 10 for readability
+    tracks = tracks[:10]
+    names = [t.get('name', 'Unknown')[:20] for t in tracks]
+    popularity = [t.get('popularity', 0) for t in tracks]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=names,
+        y=popularity,
+        marker_color='#43e97b'
+    ))
+
+    fig.update_layout(
+        title="Top 10 Track Popularity",
+        height=400,
+        showlegend=False,
+        xaxis_tickangle=-45,
         yaxis_range=[0, 100]
     )
 

@@ -363,6 +363,49 @@
       color: white;
     }
 
+    /* Feedback track items */
+    .feedback-track-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      background: #f8f9fa;
+      transition: all 0.3s ease;
+    }
+
+    .feedback-track-item:hover {
+      transform: translateX(5px);
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .feedback-track-item.liked {
+      border-left: 4px solid #48bb78;
+    }
+
+    .feedback-track-item.disliked {
+      border-left: 4px solid #f56565;
+    }
+
+    .btn-remove-feedback {
+      background: white;
+      border: 2px solid #e2e8f0;
+      color: #718096;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-left: auto;
+    }
+
+    .btn-remove-feedback:hover {
+      background: #f56565;
+      border-color: #f56565;
+      color: white;
+      transform: scale(1.1);
+    }
+
     /* Container */
     .container-custom {
       max-width: 1400px;
@@ -593,6 +636,95 @@
     </div>
   </div>
 
+  <!-- My Feedback Section -->
+  {% if liked_tracks or disliked_tracks %}
+  <div class="container-custom mt-4 mb-5">
+    <div class="row">
+      <!-- Liked Tracks -->
+      <div class="col-md-6 mb-4">
+        <div class="card-modern">
+          <div class="card-header-custom">
+            <div class="card-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+              <i class="fas fa-thumbs-up"></i>
+            </div>
+            <div>
+              <h2 class="card-title-custom">Liked Songs</h2>
+              <p class="card-subtitle-custom">
+                <i class="fas fa-heart"></i> Tracks you enjoyed
+              </p>
+            </div>
+          </div>
+
+          {% if liked_tracks %}
+            <div>
+              {% for track in liked_tracks[:10] %}
+                <div class="feedback-track-item liked">
+                  <span class="item-number">{{ loop.index }}</span>
+                  <div class="item-info">
+                    <span class="item-name">{{ track.track_name }}</span>
+                    <span class="item-artist">{{ track.artist_name }}</span>
+                  </div>
+                  <button class="btn-remove-feedback"
+                          onclick="removeFeedback('{{ track.track_id }}', this)"
+                          title="Remove">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div style="text-align: center; padding: 40px; color: #999;">
+              <i class="fas fa-heart" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+              <p>No liked songs yet. Start liking recommendations!</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Disliked Tracks -->
+      <div class="col-md-6 mb-4">
+        <div class="card-modern">
+          <div class="card-header-custom">
+            <div class="card-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);">
+              <i class="fas fa-thumbs-down"></i>
+            </div>
+            <div>
+              <h2 class="card-title-custom">Disliked Songs</h2>
+              <p class="card-subtitle-custom">
+                <i class="fas fa-ban"></i> Won't appear in recommendations
+              </p>
+            </div>
+          </div>
+
+          {% if disliked_tracks %}
+            <div>
+              {% for track in disliked_tracks[:10] %}
+                <div class="feedback-track-item disliked">
+                  <span class="item-number">{{ loop.index }}</span>
+                  <div class="item-info">
+                    <span class="item-name">{{ track.track_name }}</span>
+                    <span class="item-artist">{{ track.artist_name }}</span>
+                  </div>
+                  <button class="btn-remove-feedback"
+                          onclick="removeFeedback('{{ track.track_id }}', this)"
+                          title="Remove">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div style="text-align: center; padding: 40px; color: #999;">
+              <i class="fas fa-ban" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+              <p>No disliked songs yet.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     async function saveFeedback(trackId, trackName, artistName, feedback, button) {
@@ -645,6 +777,32 @@
       } catch (error) {
         console.error('Error saving feedback:', error);
         alert('Failed to save feedback. Please try again.');
+      }
+    }
+
+    async function removeFeedback(trackId, button) {
+      if (!confirm('Remove this track from your feedback list?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/feedback/${trackId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Remove the item from the DOM
+          const item = button.closest('.feedback-track-item');
+          item.style.opacity = '0';
+          setTimeout(() => item.remove(), 300);
+        } else {
+          alert('Failed to remove feedback. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error removing feedback:', error);
+        alert('Failed to remove feedback. Please try again.');
       }
     }
   </script>
