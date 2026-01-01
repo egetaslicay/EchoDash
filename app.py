@@ -177,7 +177,7 @@ def recommendations():
 
 @app.route("/analytics")
 def analytics():
-    """Analytics page - rebuilt from scratch."""
+    """Analytics page - using proper Plotly to_html() method."""
     token_info = session.get("token_info", None)
     if not token_info:
         return redirect(url_for("login"))
@@ -193,55 +193,95 @@ def analytics():
     except:
         artists, tracks = [], []
 
-    charts_json = {}
+    charts_html = {}
 
     # Chart 1: Top Artists (horizontal bar)
-    names = [a.get('name', 'Unknown')[:20] for a in artists[:10]]
-    charts_json['top_artists_bar'] = json.dumps({
-        'data': [{'type': 'bar', 'y': names[::-1], 'x': list(range(10, 0, -1)), 'orientation': 'h', 'marker': {'color': '#667eea'}}],
-        'layout': {'title': 'Top 10 Artists', 'height': 400, 'margin': {'l': 150}}
-    })
+    if artists:
+        names = [a.get('name', 'Unknown')[:25] for a in artists[:10]]
+        fig1 = go.Figure()
+        fig1.add_trace(go.Bar(
+            y=names[::-1],
+            x=list(range(10, 0, -1)),
+            orientation='h',
+            marker=dict(color='#667eea')
+        ))
+        fig1.update_layout(
+            title='Top 10 Artists',
+            height=400,
+            margin=dict(l=150),
+            showlegend=False
+        )
+        charts_html['top_artists_bar'] = fig1.to_html(full_html=False, include_plotlyjs=False)
+    else:
+        charts_html['top_artists_bar'] = '<div style="text-align: center; padding: 40px; color: #999;">No artist data available</div>'
 
-    # Chart 2: Genres (bar chart)
+    # Chart 2: Genre Distribution (bar chart)
     genre_counts = {}
     for a in artists:
         for g in a.get('genres', []):
             genre_counts[g] = genre_counts.get(g, 0) + 1
 
     if genre_counts:
-        top_g = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:8]
-        charts_json['genre_distribution'] = json.dumps({
-            'data': [{'type': 'bar', 'x': [g[0] for g in top_g], 'y': [g[1] for g in top_g], 'marker': {'color': '#764ba2'}}],
-            'layout': {'title': 'Top Genres', 'height': 400, 'xaxis': {'tickangle': -45}}
-        })
+        top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(
+            x=[g[0] for g in top_genres],
+            y=[g[1] for g in top_genres],
+            marker=dict(color='#764ba2')
+        ))
+        fig2.update_layout(
+            title='Top Genres',
+            height=400,
+            xaxis=dict(tickangle=-45),
+            showlegend=False
+        )
+        charts_html['genre_distribution'] = fig2.to_html(full_html=False, include_plotlyjs=False)
     else:
-        charts_json['genre_distribution'] = json.dumps({
-            'data': [],
-            'layout': {'title': 'Top Genres', 'height': 400, 'annotations': [{'text': 'No genre data', 'showarrow': False, 'font': {'size': 16}}]}
-        })
+        charts_html['genre_distribution'] = '<div style="text-align: center; padding: 40px; color: #999;">No genre data available</div>'
 
-    # Chart 3: Artist Popularity (line)
+    # Chart 3: Artist Popularity (scatter + line)
     if artists:
         pop_vals = [a.get('popularity', 0) for a in artists[:15]]
-        charts_json['artist_popularity'] = json.dumps({
-            'data': [{'type': 'scatter', 'y': pop_vals, 'mode': 'markers+lines', 'marker': {'size': 10, 'color': '#4facfe'}, 'line': {'color': '#667eea'}}],
-            'layout': {'title': 'Artist Popularity Trend', 'height': 400, 'yaxis': {'range': [0, 100]}}
-        })
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(
+            y=pop_vals,
+            mode='markers+lines',
+            marker=dict(size=10, color='#4facfe'),
+            line=dict(color='#667eea', width=2)
+        ))
+        fig3.update_layout(
+            title='Artist Popularity Trend',
+            height=400,
+            yaxis=dict(range=[0, 100], title='Popularity'),
+            xaxis=dict(title='Rank'),
+            showlegend=False
+        )
+        charts_html['artist_popularity'] = fig3.to_html(full_html=False, include_plotlyjs=False)
     else:
-        charts_json['artist_popularity'] = json.dumps({'data': [], 'layout': {'title': 'Artist Popularity', 'height': 400}})
+        charts_html['artist_popularity'] = '<div style="text-align: center; padding: 40px; color: #999;">No artist data available</div>'
 
     # Chart 4: Track Popularity (bar)
     if tracks:
-        t_names = [t.get('name', 'Unknown')[:20] for t in tracks[:10]]
+        t_names = [t.get('name', 'Unknown')[:25] for t in tracks[:10]]
         t_pop = [t.get('popularity', 0) for t in tracks[:10]]
-        charts_json['track_popularity'] = json.dumps({
-            'data': [{'type': 'bar', 'x': t_names, 'y': t_pop, 'marker': {'color': '#43e97b'}}],
-            'layout': {'title': 'Top 10 Track Popularity', 'height': 400, 'xaxis': {'tickangle': -45}}
-        })
+        fig4 = go.Figure()
+        fig4.add_trace(go.Bar(
+            x=t_names,
+            y=t_pop,
+            marker=dict(color='#43e97b')
+        ))
+        fig4.update_layout(
+            title='Top 10 Track Popularity',
+            height=400,
+            xaxis=dict(tickangle=-45),
+            yaxis=dict(title='Popularity'),
+            showlegend=False
+        )
+        charts_html['track_popularity'] = fig4.to_html(full_html=False, include_plotlyjs=False)
     else:
-        charts_json['track_popularity'] = json.dumps({'data': [], 'layout': {'title': 'Track Popularity', 'height': 400}})
+        charts_html['track_popularity'] = '<div style="text-align: center; padding: 40px; color: #999;">No track data available</div>'
 
-    return render_template("analytics.html", charts=charts_json, user_image=user_image)
+    return render_template("analytics.html", charts=charts_html, user_image=user_image)
 
 
 @app.route("/api/feedback", methods=["POST"])

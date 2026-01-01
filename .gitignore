@@ -19,6 +19,10 @@ Thumbs.db
 # Flask/SQLite stuff
 instance/
 *.sqlite3
+*.db
+
+# Spotify cache
+.cache-*
 
 # Logs
 *.log
