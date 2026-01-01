@@ -125,12 +125,12 @@ def dashboard():
     except Exception as e:
         print(f"Error saving snapshot: {e}")
 
-    # Get recommendations
-    recs = get_recommendations(sp, tracks, artists, limit=10)
+    # Get recommendations (with user feedback if available)
+    user_id = session.get("user_id")
+    recs = get_recommendations(sp, tracks, artists, limit=10, user_id=user_id)
 
     # Save recommendations to database
     try:
-        user_id = session.get("user_id")
         if user_id and recs:
             db.save_recommendations(user_id, recs)
     except Exception as e:
@@ -157,7 +157,8 @@ def recommendations():
     top_tracks = sp.current_user_top_tracks(limit=50, time_range="medium_term")["items"]
     top_artists = sp.current_user_top_artists(limit=50, time_range="medium_term")["items"]
 
-    recs = get_recommendations(sp, top_tracks, top_artists, limit=50)
+    user_id = session.get("user_id")
+    recs = get_recommendations(sp, top_tracks, top_artists, limit=50, user_id=user_id)
 
     return render_template("recommendations.html", recs=recs)
 
@@ -205,6 +206,82 @@ def analytics():
     )
 
 
+@app.route("/api/feedback", methods=["POST"])
+def save_track_feedback():
+    """API endpoint to save user feedback (like/dislike) for a track."""
+    try:
+        data = request.json
+        user_id = session.get("user_id")
+
+        if not user_id:
+            return jsonify({"error": "Not logged in"}), 401
+
+        track_id = data.get("track_id")
+        track_name = data.get("track_name")
+        artist_name = data.get("artist_name")
+        feedback = data.get("feedback")  # 1 for like, -1 for dislike
+
+        if not all([track_id, track_name, artist_name, feedback is not None]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        if feedback not in [1, -1]:
+            return jsonify({"error": "Feedback must be 1 (like) or -1 (dislike)"}), 400
+
+        db.save_feedback(user_id, track_id, track_name, artist_name, feedback)
+
+        return jsonify({
+            "success": True,
+            "message": "Feedback saved",
+            "feedback": feedback
+        })
+
+    except Exception as e:
+        print(f"Error saving feedback: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/feedback/<track_id>", methods=["DELETE"])
+def delete_track_feedback(track_id):
+    """API endpoint to delete feedback for a track."""
+    try:
+        user_id = session.get("user_id")
+
+        if not user_id:
+            return jsonify({"error": "Not logged in"}), 401
+
+        db.delete_feedback(user_id, track_id)
+
+        return jsonify({
+            "success": True,
+            "message": "Feedback deleted"
+        })
+
+    except Exception as e:
+        print(f"Error deleting feedback: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/feedback", methods=["GET"])
+def get_all_feedback():
+    """API endpoint to get all user feedback."""
+    try:
+        user_id = session.get("user_id")
+
+        if not user_id:
+            return jsonify({"error": "Not logged in"}), 401
+
+        feedback = db.get_user_feedback(user_id)
+
+        return jsonify({
+            "success": True,
+            "feedback": feedback
+        })
+
+    except Exception as e:
+        print(f"Error getting feedback: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
 def create_top_artists_chart(artists):
     """Create horizontal bar chart of top artists."""
     names = [a['name'] for a in artists]
@@ -245,8 +322,22 @@ def create_genre_distribution(artists):
             genre_counts[genre] = genre_counts.get(genre, 0) + 1
 
     if not genre_counts:
-        # Return empty chart if no genres
-        return {}
+        # Return placeholder chart if no genres
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No genre data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color="gray")
+        )
+        fig.update_layout(
+            title="Top Genres in Your Taste",
+            font=dict(family="Inter", size=12),
+            height=400,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False)
+        )
+        return fig
 
     # Get top 10 genres
     sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:10]

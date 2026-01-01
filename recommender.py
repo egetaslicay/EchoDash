@@ -77,13 +77,12 @@ def recommend_tracks(top_tracks, candidates, top_n=10):
     return candidates.sort_values("similarity", ascending=False).head(top_n)
 
 
-def get_recommendations(sp, top_tracks, top_artists, limit=50):
+def get_recommendations(sp, top_tracks, top_artists, limit=50, user_id=None):
     """
-    Generate up to `limit` fresh recommendations using ML-based audio feature analysis.
+    Generate up to `limit` fresh recommendations using ML-based recommendation engine.
 
     Recommendation Strategy (in order of priority):
-    1. ML-based: Uses Spotify audio features (acousticness, danceability, energy, etc.)
-       with cosine similarity to find tracks similar to user's taste
+    1. ML-based: Uses genre matching, artist similarity, and user feedback
     2. Fallback: Basic recommendation using Spotify's related artists
 
     Args:
@@ -91,6 +90,7 @@ def get_recommendations(sp, top_tracks, top_artists, limit=50):
         top_tracks: User's top tracks
         top_artists: User's top artists
         limit: Number of recommendations to return
+        user_id: Database user ID for personalized recommendations
 
     Returns:
         List of recommended tracks with metadata
@@ -98,8 +98,8 @@ def get_recommendations(sp, top_tracks, top_artists, limit=50):
 
     # Try ML-based recommendations first (best quality)
     try:
-        print("Attempting ML-based recommendations using audio features...")
-        recommendations = get_recommendations_ml(sp, top_tracks, top_artists, limit)
+        print("Attempting ML-based recommendations with user feedback...")
+        recommendations = get_recommendations_ml(sp, top_tracks, top_artists, limit, user_id)
         if recommendations:
             return recommendations
         print("ML recommendations returned empty, trying fallback...")

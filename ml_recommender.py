@@ -1,15 +1,17 @@
 """
 ML-based Music Recommendation Engine
 Uses artist similarity, genre matching, and popularity scoring.
+Incorporates user feedback (likes/dislikes) for personalization.
 Note: Audio features API was deprecated by Spotify.
 """
 
 import numpy as np
 import pandas as pd
 from typing import List, Dict
+import database as db
 
 
-def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
+def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
     """
     Generate music recommendations using artist similarity and genre matching.
 
@@ -34,8 +36,20 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
 
     print("=== Genre & Artist-Based Recommendation Engine ===")
 
+    # 0. Get user feedback if available
+    user_feedback = {}
+    liked_tracks = []
+    disliked_track_ids = set()
+
+    if user_id:
+        print("Step 0: Loading user feedback...")
+        user_feedback = db.get_user_feedback(user_id)
+        liked_tracks = db.get_liked_tracks(user_id)
+        disliked_track_ids = {t['track_id'] for t in db.get_disliked_tracks(user_id)}
+        print(f"  Found {len(liked_tracks)} liked tracks and {len(disliked_track_ids)} disliked tracks")
+
     # 1. Collect user's listening history
-    print("Step 1: Collecting user's listening history...")
+    print("\nStep 1: Collecting user's listening history...")
     user_track_ids = set()
 
     for rng in ["short_term", "medium_term", "long_term"]:
@@ -78,13 +92,17 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
             try:
                 top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:3]
                 for track in top_tracks_artist:
-                    if track["id"] not in user_track_ids:
+                    track_id = track["id"]
+                    # Exclude tracks already in user's library or disliked
+                    if track_id not in user_track_ids and track_id not in disliked_track_ids:
                         candidates.append({
-                            "id": track["id"],
+                            "id": track_id,
                             "name": track["name"],
                             "artist": artist["name"],
                             "artist_id": artist_id,
                             "popularity": track.get("popularity", 50),
+                            "album_image": track["album"]["images"][0]["url"] if track.get("album", {}).get("images") else None,
+                            "preview_url": track.get("preview_url"),
                             "is_favorite_artist": True
                         })
             except Exception as e:
@@ -98,13 +116,17 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
                     try:
                         rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:2]
                         for track in rel_tracks:
-                            if track["id"] not in user_track_ids:
+                            track_id = track["id"]
+                            # Exclude tracks already in user's library or disliked
+                            if track_id not in user_track_ids and track_id not in disliked_track_ids:
                                 candidates.append({
-                                    "id": track["id"],
+                                    "id": track_id,
                                     "name": track["name"],
                                     "artist": rel["name"],
                                     "artist_id": rel["id"],
                                     "popularity": track.get("popularity", 50),
+                                    "album_image": track["album"]["images"][0]["url"] if track.get("album", {}).get("images") else None,
+                                    "preview_url": track.get("preview_url"),
                                     "genres": rel.get("genres", []),
                                     "is_favorite_artist": False
                                 })
@@ -128,9 +150,19 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         print("No candidates found")
         return []
 
-    # 4. Score candidates based on genre match and popularity
-    print("\nStep 4: Scoring candidates...")
+    # 4. Score candidates based on genre match, popularity, and user feedback
+    print("\nStep 4: Scoring candidates (with user feedback)...")
     scores = []
+
+    # Extract liked track artists for boosting
+    liked_artists = set()
+    liked_genres = set()
+    if liked_tracks:
+        for liked in liked_tracks:
+            # Extract artist from "Artist - Track" format if stored that way
+            artist = liked.get('artist_name', '')
+            if artist:
+                liked_artists.add(artist)
 
     for _, track in candidates_df.iterrows():
         score = 0.0
@@ -149,6 +181,11 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
         # Favorite artist bonus
         if track.get("is_favorite_artist", False):
             score += 0.2
+
+        # User feedback bonus: boost if artist matches liked tracks
+        if liked_artists and track["artist"] in liked_artists:
+            score += 0.25
+            print(f"  ⭐ Boosted {track['name']} - artist match with liked tracks")
 
         scores.append(score)
 
@@ -172,8 +209,11 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50):
             continue
 
         recommendations.append({
+            "id": track["id"],
             "name": track["name"],
             "artist": track["artist"],
+            "album_image": track.get("album_image"),
+            "preview_url": track.get("preview_url"),
             "score": round(track["score"], 3),
             "source": "ML Genre Match" if track.get("genres") else "ML Artist Match"
         })
