@@ -24,7 +24,7 @@ if not app.secret_key:
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
-SCOPE = "user-top-read"
+SCOPE = "user-top-read user-read-recently-played user-library-read"
 
 
 def create_spotify_oauth(force_reauth=False):
