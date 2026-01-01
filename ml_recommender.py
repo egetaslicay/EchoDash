@@ -1,8 +1,7 @@
 """
 ML-based Music Recommendation Engine
-Uses artist similarity, genre matching, and popularity scoring.
+Uses Spotify's recommendations API with randomized seeds and audio features.
 Incorporates user feedback (likes/dislikes) for personalization.
-Note: Audio features API was deprecated by Spotify.
 """
 
 import numpy as np
@@ -14,28 +13,30 @@ import database as db
 
 def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
     """
-    Generate music recommendations using artist similarity and genre matching.
+    Generate music recommendations using Spotify's recommendations API.
 
     Algorithm:
-    1. Build candidate pool from top artists and related artists
-    2. Extract user's preferred genres from top artists
-    3. Score candidates based on:
-       - Artist popularity match
-       - Genre overlap
-       - Diversity (avoid same artist)
-    4. Rank and return top recommendations
+    1. Build diverse seed pool from user's top tracks and artists
+    2. Analyze user's audio feature preferences from listening history
+    3. Make multiple calls to sp.recommendations() with:
+       - Randomized seed combinations (max 5 seeds per call)
+       - Tunable audio features based on user preferences
+       - Varying parameters for diversity
+    4. Filter out duplicates, liked/disliked tracks
+    5. Score and rank results
 
     Args:
         sp: Spotipy client
         top_tracks: User's top tracks
         top_artists: User's top artists
         limit: Number of recommendations to return
+        user_id: User ID for feedback and history
 
     Returns:
         List of recommended tracks with metadata
     """
 
-    print("=== Genre & Artist-Based Recommendation Engine ===")
+    print("=== Spotify Recommendations API Engine ===")
 
     # 0. Get user feedback and recommendation history
     user_feedback = {}
@@ -55,204 +56,298 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
         print(f"  Found {len(recently_recommended_ids)} recently recommended tracks (last 3 days)")
         print(f"  Excluding {len(liked_track_ids) + len(disliked_track_ids) + len(recently_recommended_ids)} tracks from recommendations")
 
-    # 1. Collect user's listening history
-    print("\nStep 1: Collecting user's listening history...")
-    user_track_ids = set()
+    # 1. Build seed pools
+    print("\nStep 1: Building seed pools...")
 
-    for rng in ["short_term", "medium_term", "long_term"]:
-        try:
-            history = sp.current_user_top_tracks(limit=50, time_range=rng)["items"]
-            user_track_ids.update([t["id"] for t in history if "id" in t])
-        except Exception:
-            continue
+    # Get track IDs and artist IDs from user's top items
+    seed_track_ids = [t["id"] for t in top_tracks[:50] if "id" in t]
+    seed_artist_ids = [a["id"] for a in top_artists[:50] if "id" in a]
 
+    # Get user's genre preferences
+    user_genres = []
+    for artist in top_artists[:20]:
+        user_genres.extend(artist.get("genres", []))
+    user_genres = list(set(user_genres))  # Remove duplicates
+
+    # Get available seed genres from Spotify
     try:
-        recent = sp.current_user_recently_played(limit=50)["items"]
-        user_track_ids.update([r["track"]["id"] for r in recent if "track" in r and "id" in r["track"]])
-    except Exception:
-        pass
+        available_genres = sp.recommendation_genre_seeds()["genres"]
+        # Filter to only use genres that Spotify accepts as seeds
+        seed_genres = [g for g in user_genres if g in available_genres]
+    except Exception as e:
+        print(f"  Warning: Could not fetch available genres: {e}")
+        seed_genres = []
 
-    user_track_ids.update([t["id"] for t in top_tracks if "id" in t])
-    print(f"Found {len(user_track_ids)} tracks in user's history")
+    print(f"  Seed pools: {len(seed_track_ids)} tracks, {len(seed_artist_ids)} artists, {len(seed_genres)} genres")
 
-    # 2. Extract user's preferred genres
-    print("\nStep 2: Analyzing user's genre preferences...")
-    user_genres = {}
-    user_artist_ids = set()
+    # 2. Analyze user's audio feature preferences
+    print("\nStep 2: Analyzing user's audio feature preferences...")
+    audio_features = analyze_user_audio_preferences(sp, seed_track_ids[:50])
 
-    for artist in top_artists:
-        user_artist_ids.add(artist["id"])
-        for genre in artist.get("genres", []):
-            user_genres[genre] = user_genres.get(genre, 0) + 1
+    if audio_features:
+        print(f"  Target features: energy={audio_features.get('target_energy', 0.5):.2f}, "
+              f"danceability={audio_features.get('target_danceability', 0.5):.2f}, "
+              f"valence={audio_features.get('target_valence', 0.5):.2f}")
+    else:
+        print("  Using default audio features")
+        audio_features = {}
 
-    print(f"User enjoys {len(user_genres)} genres: {', '.join(list(user_genres.keys())[:5])}...")
-
-    # 3. Build candidate pool from related artists (MASSIVELY EXPANDED)
-    print("\nStep 3: Building candidate pool from related artists...")
-    candidates = []
+    # 3. Generate multiple batches of recommendations with different seeds
+    print("\nStep 3: Generating recommendations with randomized seeds...")
+    all_recommendations = []
+    seen_track_ids = set()
     filtered_count = 0
 
-    # Process MORE artists (20 instead of 10)
-    for artist in top_artists[:20]:
+    # Calculate how many batches we need (accounting for duplicates/filtering)
+    # We'll generate more than needed and filter down
+    batches_needed = max(5, (limit // 10) + 2)
+
+    for batch in range(batches_needed):
         try:
-            artist_id = artist["id"]
+            # Randomize seed selection for each batch
+            batch_seeds = select_random_seeds(
+                seed_track_ids,
+                seed_artist_ids,
+                seed_genres,
+                batch_num=batch
+            )
 
-            # Get MORE tracks from artist (10 instead of 3)
-            try:
-                top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:10]
-                for track in top_tracks_artist:
-                    track_id = track["id"]
-                    # Exclude tracks already in user's library, liked, disliked, or recently recommended
-                    if track_id in disliked_track_ids or track_id in liked_track_ids or track_id in recently_recommended_ids:
-                        filtered_count += 1
-                        continue
-                    if track_id not in user_track_ids:
-                        candidates.append({
-                            "id": track_id,
-                            "name": track["name"],
-                            "artist": artist["name"],
-                            "artist_id": artist_id,
-                            "popularity": track.get("popularity", 50),
-                            "album_image": track["album"]["images"][0]["url"] if track.get("album", {}).get("images") else None,
-                            "preview_url": track.get("preview_url"),
-                            "is_favorite_artist": True
-                        })
-            except Exception as e:
-                print(f"  Error fetching tracks for {artist.get('name', 'unknown')}: {e}")
-                continue
+            # Add some randomization to audio features for diversity
+            batch_audio_features = randomize_audio_features(audio_features, variation=0.15)
 
-            # Get MORE related artists (10 instead of 3)
-            try:
-                related = sp.artist_related_artists(artist_id)["artists"][:10]
-                for rel in related:
-                    try:
-                        # Get MORE tracks per related artist (5 instead of 2)
-                        rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:5]
-                        for track in rel_tracks:
-                            track_id = track["id"]
-                            # Exclude tracks already in user's library, liked, disliked, or recently recommended
-                            if track_id in disliked_track_ids or track_id in liked_track_ids or track_id in recently_recommended_ids:
-                                filtered_count += 1
-                                continue
-                            if track_id not in user_track_ids:
-                                candidates.append({
-                                    "id": track_id,
-                                    "name": track["name"],
-                                    "artist": rel["name"],
-                                    "artist_id": rel["id"],
-                                    "popularity": track.get("popularity", 50),
-                                    "album_image": track["album"]["images"][0]["url"] if track.get("album", {}).get("images") else None,
-                                    "preview_url": track.get("preview_url"),
-                                    "genres": rel.get("genres", []),
-                                    "is_favorite_artist": False
-                                })
-                    except Exception:
-                        continue
-            except Exception as e:
-                print(f"  Error fetching related artists for {artist.get('name', 'unknown')}: {e}")
-                continue
+            print(f"\n  Batch {batch + 1}/{batches_needed}:")
+            print(f"    Seeds: {batch_seeds['seed_artists'][:2] if batch_seeds.get('seed_artists') else []}, "
+                  f"{batch_seeds['seed_tracks'][:2] if batch_seeds.get('seed_tracks') else []}, "
+                  f"{batch_seeds['seed_genres'][:2] if batch_seeds.get('seed_genres') else []}")
+
+            # Call Spotify's recommendations API
+            recommendations_response = sp.recommendations(
+                limit=20,  # Get 20 per batch
+                **batch_seeds,
+                **batch_audio_features,
+                market='US'
+            )
+
+            tracks = recommendations_response.get('tracks', [])
+            print(f"    Retrieved {len(tracks)} recommendations")
+
+            # Process each track
+            for track in tracks:
+                track_id = track['id']
+
+                # Skip duplicates
+                if track_id in seen_track_ids:
+                    continue
+
+                # Filter out liked, disliked, and recently recommended
+                if (track_id in liked_track_ids or
+                    track_id in disliked_track_ids or
+                    track_id in recently_recommended_ids):
+                    filtered_count += 1
+                    continue
+
+                # Add to recommendations
+                seen_track_ids.add(track_id)
+                all_recommendations.append({
+                    'id': track_id,
+                    'name': track['name'],
+                    'artist': ', '.join([a['name'] for a in track['artists']]),
+                    'artist_id': track['artists'][0]['id'] if track['artists'] else None,
+                    'popularity': track.get('popularity', 50),
+                    'album_image': track['album']['images'][0]['url'] if track.get('album', {}).get('images') else None,
+                    'preview_url': track.get('preview_url'),
+                    'batch': batch
+                })
+
+            # Stop if we have enough recommendations
+            if len(all_recommendations) >= limit * 1.5:
+                break
 
         except Exception as e:
-            print(f"  Error processing artist: {e}")
+            print(f"  Error in batch {batch + 1}: {e}")
             continue
 
-    # Remove duplicates
-    candidates_df = pd.DataFrame(candidates)
-    if not candidates_df.empty:
-        candidates_df = candidates_df.drop_duplicates(subset=["id"])
-    print(f"Collected {len(candidates_df)} candidate tracks")
+    print(f"\n  Total collected: {len(all_recommendations)} unique tracks")
     if filtered_count > 0:
         print(f"  ⛔ Filtered out {filtered_count} tracks (liked + disliked + recently recommended)")
 
-    if candidates_df.empty:
-        print("No candidates found")
+    if not all_recommendations:
+        print("No recommendations found")
         return []
 
-    # 4. Score candidates based on genre match, popularity, and user feedback
-    print("\nStep 4: Scoring candidates (with user feedback)...")
-    scores = []
+    # 4. Score and rank recommendations
+    print("\nStep 4: Scoring and ranking recommendations...")
 
-    # Extract liked track artists for boosting
+    # Get liked artists for boosting
     liked_artists = set()
-    liked_genres = set()
     if liked_tracks:
         for liked in liked_tracks:
-            # Extract artist from "Artist - Track" format if stored that way
             artist = liked.get('artist_name', '')
             if artist:
                 liked_artists.add(artist)
 
-    for _, track in candidates_df.iterrows():
+    # Calculate scores
+    for rec in all_recommendations:
         score = 0.0
 
-        # Base score from popularity (normalized 0-1)
-        popularity_score = track["popularity"] / 100.0
+        # Popularity score (30% weight)
+        popularity_score = rec['popularity'] / 100.0
         score += popularity_score * 0.3
 
-        # Genre matching bonus
-        track_genres = track.get("genres", [])
-        if track_genres:
-            genre_overlap = len(set(track_genres) & set(user_genres.keys()))
-            genre_score = min(genre_overlap / len(user_genres), 1.0) if user_genres else 0
-            score += genre_score * 0.5
-
-        # Favorite artist bonus
-        if track.get("is_favorite_artist", False):
-            score += 0.2
-
-        # User feedback bonus: boost if artist matches liked tracks
-        if liked_artists and track["artist"] in liked_artists:
+        # Boost if artist matches liked tracks (25% bonus)
+        if liked_artists and rec['artist'] in liked_artists:
             score += 0.25
-            print(f"  ⭐ Boosted {track['name']} - artist match with liked tracks")
 
-        # Add HEAVY random factor for diversity (±25% instead of ±5%)
-        random_factor = random.uniform(-0.25, 0.25)
+        # Newer batches get slight penalty to prefer earlier (more relevant) results
+        batch_penalty = rec['batch'] * 0.02
+        score -= batch_penalty
+
+        # Add randomization for diversity (±10%)
+        random_factor = random.uniform(-0.1, 0.1)
         score += random_factor
 
-        scores.append(score)
-
-    candidates_df["score"] = scores
-
-    # 5. Rank and filter for diversity WITH HEAVY RANDOMIZATION
-    print("\nStep 5: Ranking with heavy randomization...")
+        rec['score'] = score
 
     # Sort by score
-    candidates_df = candidates_df.sort_values("score", ascending=False)
+    all_recommendations.sort(key=lambda x: x['score'], reverse=True)
 
-    # Take top candidates (5x the limit) and RANDOMLY SAMPLE from them
-    top_pool_size = min(len(candidates_df), limit * 5)
-    top_candidates = candidates_df.head(top_pool_size)
-
-    # Shuffle the top pool to add randomness
-    top_candidates = top_candidates.sample(frac=1.0).reset_index(drop=True)
-
-    print(f"  Selected top {top_pool_size} candidates, now randomly sampling with diversity...")
-
-    recommendations = []
+    # 5. Apply diversity filter
+    print("\nStep 5: Applying diversity filters...")
+    final_recommendations = []
     artist_counts = {}
     max_per_artist = 2
 
-    for _, track in top_candidates.iterrows():
-        artist_id = track["artist_id"]
+    for rec in all_recommendations:
+        artist_id = rec['artist_id']
 
-        # Diversity filter: limit tracks per artist
-        if artist_counts.get(artist_id, 0) >= max_per_artist:
+        # Limit tracks per artist for diversity
+        if artist_id and artist_counts.get(artist_id, 0) >= max_per_artist:
             continue
 
-        recommendations.append({
-            "id": track["id"],
-            "name": track["name"],
-            "artist": track["artist"],
-            "album_image": track.get("album_image"),
-            "preview_url": track.get("preview_url"),
-            "score": round(track["score"], 3),
-            "source": "ML Genre Match" if track.get("genres") else "ML Artist Match"
+        final_recommendations.append({
+            'id': rec['id'],
+            'name': rec['name'],
+            'artist': rec['artist'],
+            'album_image': rec['album_image'],
+            'preview_url': rec['preview_url'],
+            'score': round(rec['score'], 3),
+            'source': 'Spotify Recommendations API'
         })
 
-        artist_counts[artist_id] = artist_counts.get(artist_id, 0) + 1
+        if artist_id:
+            artist_counts[artist_id] = artist_counts.get(artist_id, 0) + 1
 
-        if len(recommendations) >= limit:
+        if len(final_recommendations) >= limit:
             break
 
-    print(f"\n✓ Generated {len(recommendations)} recommendations from pool of {len(candidates_df)} candidates")
-    return recommendations
+    print(f"\n✓ Generated {len(final_recommendations)} diverse recommendations")
+    return final_recommendations
+
+
+def select_random_seeds(track_ids, artist_ids, genre_ids, batch_num=0):
+    """
+    Select a random combination of seeds (max 5 total).
+    Uses batch number as random seed for reproducibility within a session.
+
+    Spotify API allows up to 5 seeds total across tracks, artists, and genres.
+    """
+    random.seed(batch_num + random.randint(0, 10000))
+
+    seeds = {}
+    total_seeds = 0
+    max_seeds = 5
+
+    # Randomly decide seed distribution
+    # We want variety across batches
+    strategies = [
+        # More tracks
+        {'tracks': 3, 'artists': 2, 'genres': 0},
+        {'tracks': 3, 'artists': 1, 'genres': 1},
+        # More artists
+        {'tracks': 2, 'artists': 3, 'genres': 0},
+        {'tracks': 1, 'artists': 3, 'genres': 1},
+        # Balanced
+        {'tracks': 2, 'artists': 2, 'genres': 1},
+        {'tracks': 1, 'artists': 2, 'genres': 2},
+        # Genre-heavy
+        {'tracks': 1, 'artists': 1, 'genres': 3},
+        {'tracks': 2, 'artists': 0, 'genres': 3},
+    ]
+
+    # Pick a strategy based on batch number
+    strategy = strategies[batch_num % len(strategies)]
+
+    # Select random seeds according to strategy
+    if track_ids and strategy['tracks'] > 0:
+        selected = random.sample(track_ids, min(strategy['tracks'], len(track_ids)))
+        seeds['seed_tracks'] = selected
+
+    if artist_ids and strategy['artists'] > 0:
+        selected = random.sample(artist_ids, min(strategy['artists'], len(artist_ids)))
+        seeds['seed_artists'] = selected
+
+    if genre_ids and strategy['genres'] > 0:
+        selected = random.sample(genre_ids, min(strategy['genres'], len(genre_ids)))
+        seeds['seed_genres'] = selected
+
+    return seeds
+
+
+def analyze_user_audio_preferences(sp, track_ids):
+    """
+    Analyze user's audio feature preferences from their top tracks.
+    Returns target audio features for recommendations API.
+    """
+    if not track_ids:
+        return {}
+
+    try:
+        # Get audio features for user's tracks (in batches of 100)
+        all_features = []
+        for i in range(0, min(len(track_ids), 50), 50):
+            batch = track_ids[i:i+50]
+            features = sp.audio_features(batch)
+            all_features.extend([f for f in features if f is not None])
+
+        if not all_features:
+            return {}
+
+        # Calculate average values
+        avg_features = {
+            'energy': np.mean([f['energy'] for f in all_features]),
+            'danceability': np.mean([f['danceability'] for f in all_features]),
+            'valence': np.mean([f['valence'] for f in all_features]),
+            'acousticness': np.mean([f['acousticness'] for f in all_features]),
+            'instrumentalness': np.mean([f['instrumentalness'] for f in all_features]),
+        }
+
+        # Return as target_ parameters for recommendations API
+        return {
+            'target_energy': round(avg_features['energy'], 2),
+            'target_danceability': round(avg_features['danceability'], 2),
+            'target_valence': round(avg_features['valence'], 2),
+            'target_acousticness': round(avg_features['acousticness'], 2),
+            'target_instrumentalness': round(avg_features['instrumentalness'], 2),
+        }
+
+    except Exception as e:
+        print(f"  Warning: Could not analyze audio features: {e}")
+        return {}
+
+
+def randomize_audio_features(base_features, variation=0.15):
+    """
+    Add random variation to audio features for diversity.
+    Variation determines how much to vary (0.15 = ±15%)
+    """
+    if not base_features:
+        return {}
+
+    randomized = {}
+    for key, value in base_features.items():
+        # Add random variation
+        varied_value = value + random.uniform(-variation, variation)
+        # Clamp to valid range [0, 1]
+        randomized[key] = max(0.0, min(1.0, varied_value))
+
+    return randomized
