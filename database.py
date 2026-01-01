@@ -67,11 +67,28 @@ def init_db():
         )
     ''')
 
+    # User feedback table - likes and dislikes for tracks
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            track_id TEXT NOT NULL,
+            track_name TEXT,
+            artist_name TEXT,
+            feedback INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            UNIQUE(user_id, track_id)
+        )
+    ''')
+
     # Create indexes for faster queries
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_spotify ON users(spotify_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_user ON listening_snapshots(user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_time ON listening_snapshots(timestamp)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_recs_user ON recommendations(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_user ON user_feedback(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_track ON user_feedback(track_id)')
 
     conn.commit()
     conn.close()
@@ -248,6 +265,108 @@ def get_user_stats(user_id: int) -> Dict:
         'first_snapshot': first_snapshot,
         'has_history': snapshot_count > 0
     }
+
+
+def save_feedback(user_id: int, track_id: str, track_name: str, artist_name: str, feedback: int):
+    """
+    Save user feedback (like/dislike) for a track.
+
+    Args:
+        user_id: Database user ID
+        track_id: Spotify track ID
+        track_name: Track name
+        artist_name: Artist name
+        feedback: 1 for like, -1 for dislike
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            INSERT OR REPLACE INTO user_feedback
+            (user_id, track_id, track_name, artist_name, feedback, created_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (user_id, track_id, track_name, artist_name, feedback))
+
+        conn.commit()
+    except Exception as e:
+        print(f"Error saving feedback: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def get_user_feedback(user_id: int) -> Dict[str, int]:
+    """
+    Get all feedback for a user as a dict of track_id -> feedback.
+
+    Args:
+        user_id: Database user ID
+
+    Returns:
+        Dictionary mapping track IDs to feedback values (1 or -1)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT track_id, feedback
+        FROM user_feedback
+        WHERE user_id = ?
+    ''', (user_id,))
+
+    feedback_dict = {row['track_id']: row['feedback'] for row in cursor.fetchall()}
+
+    conn.close()
+    return feedback_dict
+
+
+def get_liked_tracks(user_id: int) -> List[Dict]:
+    """Get all tracks the user liked."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT track_id, track_name, artist_name, created_at
+        FROM user_feedback
+        WHERE user_id = ? AND feedback = 1
+        ORDER BY created_at DESC
+    ''', (user_id,))
+
+    liked = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return liked
+
+
+def get_disliked_tracks(user_id: int) -> List[Dict]:
+    """Get all tracks the user disliked."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT track_id, track_name, artist_name, created_at
+        FROM user_feedback
+        WHERE user_id = ? AND feedback = -1
+        ORDER BY created_at DESC
+    ''', (user_id,))
+
+    disliked = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return disliked
+
+
+def delete_feedback(user_id: int, track_id: str):
+    """Delete feedback for a specific track."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        DELETE FROM user_feedback
+        WHERE user_id = ? AND track_id = ?
+    ''', (user_id, track_id))
+
+    conn.commit()
+    conn.close()
 
 
 # Initialize database on module import

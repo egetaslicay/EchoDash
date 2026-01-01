@@ -319,6 +319,50 @@
       color: white;
     }
 
+    /* Feedback buttons */
+    .feedback-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-feedback {
+      background: white;
+      border: 2px solid #e2e8f0;
+      color: #718096;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    .btn-feedback:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-like:hover {
+      border-color: #48bb78;
+      color: #48bb78;
+    }
+
+    .btn-like.active {
+      background: #48bb78;
+      border-color: #48bb78;
+      color: white;
+    }
+
+    .btn-dislike:hover {
+      border-color: #f56565;
+      color: #f56565;
+    }
+
+    .btn-dislike.active {
+      background: #f56565;
+      border-color: #f56565;
+      color: white;
+    }
+
     /* Container */
     .container-custom {
       max-width: 1400px;
@@ -513,6 +557,19 @@
                 <i class="fas fa-chart-line"></i> {{ "%.0f"|format(rec.score * 100) }}%
               </span>
 
+              <div class="feedback-buttons">
+                <button class="btn-feedback btn-like"
+                        onclick="saveFeedback('{{ rec.id }}', '{{ rec.name|replace("'", "\\'") }}', '{{ rec.artist|replace("'", "\\'") }}', 1, this)"
+                        title="Like this track">
+                  <i class="fas fa-thumbs-up"></i>
+                </button>
+                <button class="btn-feedback btn-dislike"
+                        onclick="saveFeedback('{{ rec.id }}', '{{ rec.name|replace("'", "\\'") }}', '{{ rec.artist|replace("'", "\\'") }}', -1, this)"
+                        title="Dislike this track">
+                  <i class="fas fa-thumbs-down"></i>
+                </button>
+              </div>
+
               {% if rec.preview_url %}
                 <audio controls class="audio-player">
                   <source src="{{ rec.preview_url }}" type="audio/mpeg">
@@ -537,5 +594,59 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    async function saveFeedback(trackId, trackName, artistName, feedback, button) {
+      try {
+        // Send feedback to server
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            track_id: trackId,
+            track_name: trackName,
+            artist_name: artistName,
+            feedback: feedback
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Update button states
+          const recItem = button.closest('.rec-item');
+          const likeBtn = recItem.querySelector('.btn-like');
+          const dislikeBtn = recItem.querySelector('.btn-dislike');
+
+          // Toggle active state
+          if (feedback === 1) {
+            likeBtn.classList.add('active');
+            dislikeBtn.classList.remove('active');
+          } else {
+            dislikeBtn.classList.add('active');
+            likeBtn.classList.remove('active');
+          }
+
+          // Show brief feedback
+          button.innerHTML = feedback === 1 ?
+            '<i class="fas fa-check"></i>' :
+            '<i class="fas fa-check"></i>';
+
+          setTimeout(() => {
+            button.innerHTML = feedback === 1 ?
+              '<i class="fas fa-thumbs-up"></i>' :
+              '<i class="fas fa-thumbs-down"></i>';
+          }, 1000);
+        } else {
+          console.error('Failed to save feedback:', data.error);
+          alert('Failed to save feedback. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving feedback:', error);
+        alert('Failed to save feedback. Please try again.');
+      }
+    }
+  </script>
 </body>
 </html>

@@ -233,8 +233,18 @@
 
     // Render each chart
     for (const [id, data] of Object.entries(charts)) {
-      if (data && data.data) {
-        Plotly.newPlot(id, data.data, data.layout, {responsive: true});
+      const element = document.getElementById(id);
+      if (!element) continue;
+
+      try {
+        if (data && (data.data || data.layout)) {
+          Plotly.newPlot(id, data.data || [], data.layout || {}, {responsive: true});
+        } else {
+          element.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">No data available</div>';
+        }
+      } catch (error) {
+        console.error(`Error rendering chart ${id}:`, error);
+        element.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Error loading chart</div>';
       }
     }
   </script>
