@@ -177,27 +177,22 @@ def analytics():
 
     # Get listening data
     tracks_short = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
-    artists_short = sp.current_user_top_artists(limit=10, time_range="short_term")["items"]
+    artists_short = sp.current_user_top_artists(limit=20, time_range="short_term")["items"]
 
-    # Get audio features for top tracks
-    track_ids = [t['id'] for t in tracks_short]
-    audio_features_raw = sp.audio_features(track_ids)
-    audio_features = [f for f in audio_features_raw if f]  # Filter out None
-
-    # Generate visualizations
+    # Generate visualizations (without deprecated audio features API)
     charts = {}
 
-    # 1. Audio Features Radar Chart
-    charts['audio_features_radar'] = create_audio_features_radar(audio_features)
-
-    # 2. Top Artists Bar Chart
+    # 1. Top Artists Bar Chart
     charts['top_artists_bar'] = create_top_artists_chart(artists_short[:10])
 
-    # 3. Mood/Energy Scatter Plot
-    charts['mood_scatter'] = create_mood_scatter(tracks_short, audio_features)
+    # 2. Genre Distribution Pie Chart
+    charts['genre_distribution'] = create_genre_distribution(artists_short)
 
-    # 4. Audio Feature Distribution
-    charts['feature_distribution'] = create_feature_distribution(audio_features)
+    # 3. Artist Popularity Chart
+    charts['artist_popularity'] = create_artist_popularity_chart(artists_short[:15])
+
+    # 4. Track Popularity Chart
+    charts['track_popularity'] = create_track_popularity_chart(tracks_short)
 
     # Convert plots to JSON for embedding in HTML
     charts_json = {key: json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder)
@@ -208,41 +203,6 @@ def analytics():
         charts=charts_json,
         user_image=user_image
     )
-
-
-def create_audio_features_radar(audio_features):
-    """Create radar chart of average audio features."""
-    if not audio_features:
-        return {}
-
-    # Calculate average features
-    features = ['danceability', 'energy', 'speechiness', 'acousticness', 'instrumentalness', 'valence']
-    averages = {}
-
-    for feature in features:
-        values = [f.get(feature, 0) for f in audio_features if f.get(feature) is not None]
-        averages[feature] = np.mean(values) if values else 0
-
-    # Create radar chart
-    fig = go.Figure(data=go.Scatterpolar(
-        r=list(averages.values()),
-        theta=[f.capitalize() for f in features],
-        fill='toself',
-        line=dict(color='#667eea', width=2),
-        fillcolor='rgba(102, 126, 234, 0.3)'
-    ))
-
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1])
-        ),
-        showlegend=False,
-        title="Your Music DNA",
-        font=dict(family="Inter", size=14),
-        height=400
-    )
-
-    return fig
 
 
 def create_top_artists_chart(artists):
@@ -276,76 +236,106 @@ def create_top_artists_chart(artists):
     return fig
 
 
-def create_mood_scatter(tracks, audio_features):
-    """Create scatter plot of energy vs valence (mood quadrants)."""
-    if not audio_features:
+def create_genre_distribution(artists):
+    """Create pie chart of genre distribution."""
+    # Extract all genres from artists
+    genre_counts = {}
+    for artist in artists:
+        for genre in artist.get('genres', []):
+            genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+    if not genre_counts:
+        # Return empty chart if no genres
         return {}
 
-    energy = [f.get('energy', 0) for f in audio_features]
-    valence = [f.get('valence', 0) for f in audio_features]
-    track_names = [t['name'][:30] + '...' if len(t['name']) > 30 else t['name']
-                   for t in tracks[:len(audio_features)]]
+    # Get top 10 genres
+    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    genres, counts = zip(*sorted_genres) if sorted_genres else ([], [])
 
-    fig = go.Figure(data=go.Scatter(
-        x=valence,
-        y=energy,
-        mode='markers',
-        marker=dict(
-            size=12,
-            color=energy,
-            colorscale='Viridis',
-            showscale=True,
-            colorbar=dict(title="Energy")
-        ),
-        text=track_names,
-        hovertemplate='<b>%{text}</b><br>Valence: %{x:.2f}<br>Energy: %{y:.2f}<extra></extra>'
-    ))
-
-    # Add quadrant lines
-    fig.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_vline(x=0.5, line_dash="dash", line_color="gray", opacity=0.5)
-
-    # Add quadrant labels
-    fig.add_annotation(x=0.75, y=0.75, text="Energetic<br>& Happy", showarrow=False, opacity=0.5)
-    fig.add_annotation(x=0.25, y=0.75, text="Energetic<br>& Dark", showarrow=False, opacity=0.5)
-    fig.add_annotation(x=0.75, y=0.25, text="Calm<br>& Happy", showarrow=False, opacity=0.5)
-    fig.add_annotation(x=0.25, y=0.25, text="Calm<br>& Dark", showarrow=False, opacity=0.5)
+    fig = go.Figure(data=[
+        go.Pie(
+            labels=genres,
+            values=counts,
+            marker=dict(
+                colors=['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b',
+                        '#fa709a', '#fee140', '#30cfd0', '#c471ed', '#f38181']
+            ),
+            textinfo='label+percent',
+            hovertemplate='<b>%{label}</b><br>%{value} artists<br>%{percent}<extra></extra>'
+        )
+    ])
 
     fig.update_layout(
-        title="Mood Map (Energy vs Positivity)",
-        xaxis_title="Valence (Musical Positivity)",
-        yaxis_title="Energy",
+        title="Top Genres in Your Taste",
         font=dict(family="Inter", size=12),
-        height=500
+        height=400
     )
 
     return fig
 
 
-def create_feature_distribution(audio_features):
-    """Create histogram of tempo distribution."""
-    if not audio_features:
-        return {}
-
-    tempos = [f.get('tempo', 0) for f in audio_features if f.get('tempo')]
+def create_artist_popularity_chart(artists):
+    """Create bar chart showing artist popularity scores."""
+    names = [a['name'] for a in artists]
+    popularity = [a.get('popularity', 0) for a in artists]
 
     fig = go.Figure(data=[
-        go.Histogram(
-            x=tempos,
-            nbinsx=20,
+        go.Bar(
+            x=names,
+            y=popularity,
             marker=dict(
-                color='#667eea',
-                line=dict(color='white', width=1)
+                color=popularity,
+                colorscale=[[0, '#764ba2'], [0.5, '#667eea'], [1, '#43e97b']],
+                showscale=False
             )
         )
     ])
 
     fig.update_layout(
-        title="Tempo Distribution (BPM)",
-        xaxis_title="Tempo (BPM)",
-        yaxis_title="Number of Tracks",
+        title="Artist Popularity Scores",
+        xaxis_title="Artist",
+        yaxis_title="Popularity (0-100)",
         font=dict(family="Inter", size=12),
-        height=350
+        height=450,
+        xaxis_tickangle=-45
+    )
+
+    return fig
+
+
+def create_track_popularity_chart(tracks):
+    """Create scatter plot of track popularity."""
+    track_names = [t['name'][:25] + '...' if len(t['name']) > 25 else t['name']
+                   for t in tracks]
+    popularity = [t.get('popularity', 0) for t in tracks]
+
+    # Color by popularity
+    colors = ['#43e97b' if p >= 70 else '#667eea' if p >= 40 else '#764ba2'
+              for p in popularity]
+
+    fig = go.Figure(data=[
+        go.Scatter(
+            x=list(range(1, len(tracks) + 1)),
+            y=popularity,
+            mode='markers+lines',
+            marker=dict(
+                size=10,
+                color=colors,
+                line=dict(width=1, color='white')
+            ),
+            line=dict(color='rgba(102, 126, 234, 0.3)', width=2),
+            text=track_names,
+            hovertemplate='<b>%{text}</b><br>Rank: #%{x}<br>Popularity: %{y}<extra></extra>'
+        )
+    ])
+
+    fig.update_layout(
+        title="Track Popularity (Your Top 20)",
+        xaxis_title="Rank",
+        yaxis_title="Popularity Score",
+        font=dict(family="Inter", size=12),
+        height=400,
+        yaxis_range=[0, 100]
     )
 
     return fig
