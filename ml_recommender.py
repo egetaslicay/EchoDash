@@ -116,11 +116,13 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
             batch_audio_features = randomize_audio_features(audio_features, variation=0.15)
 
             print(f"\n  Batch {batch + 1}/{batches_needed}:")
-            print(f"    Seeds: {batch_seeds['seed_artists'][:2] if batch_seeds.get('seed_artists') else []}, "
-                  f"{batch_seeds['seed_tracks'][:2] if batch_seeds.get('seed_tracks') else []}, "
-                  f"{batch_seeds['seed_genres'][:2] if batch_seeds.get('seed_genres') else []}")
+            print(f"    Seeds: artists={len(batch_seeds.get('seed_artists', []))}, "
+                  f"tracks={len(batch_seeds.get('seed_tracks', []))}, "
+                  f"genres={len(batch_seeds.get('seed_genres', []))}")
+            print(f"    Audio features: {list(batch_audio_features.keys())}")
 
             # Call Spotify's recommendations API
+            print(f"    Calling sp.recommendations()...")
             recommendations_response = sp.recommendations(
                 limit=20,  # Get 20 per batch
                 **batch_seeds,
@@ -129,7 +131,7 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
             )
 
             tracks = recommendations_response.get('tracks', [])
-            print(f"    Retrieved {len(tracks)} recommendations")
+            print(f"    ✓ Retrieved {len(tracks)} recommendations from Spotify")
 
             # Process each track
             for track in tracks:
@@ -164,7 +166,9 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                 break
 
         except Exception as e:
-            print(f"  Error in batch {batch + 1}: {e}")
+            print(f"  ❌ ERROR in batch {batch + 1}: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             continue
 
     print(f"\n  Total collected: {len(all_recommendations)} unique tracks")
