@@ -105,18 +105,36 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
         print(f"  Found {len(liked_track_ids)} liked and {len(disliked_track_ids)} disliked tracks")
         print(f"  Excluding {len(recently_recommended_ids)} recently recommended tracks")
 
-    # 1. Build seed pool from user's top tracks
-    print("\nStep 1: Building seed pool from top tracks...")
+    # 1. Build user taste profile (genres + artists)
+    print("\nStep 1: Building your taste profile...")
     seed_track_ids = [t["id"] for t in top_tracks[:100] if "id" in t]
 
     if not seed_track_ids:
         print("  ❌ No seed tracks available")
         return []
 
-    print(f"  Seed pool: {len(seed_track_ids)} tracks")
+    # Extract user's favorite genres from top artists
+    user_genres = {}
+    user_artist_ids = set()
+    user_artist_names = set()
+
+    for artist in top_artists[:50]:  # Use top 50 artists
+        user_artist_ids.add(artist["id"])
+        user_artist_names.add(artist["name"].lower())
+        for genre in artist.get("genres", []):
+            user_genres[genre] = user_genres.get(genre, 0) + 1
+
+    # Sort genres by frequency
+    top_genres = sorted(user_genres.items(), key=lambda x: x[1], reverse=True)
+    user_genre_set = set(user_genres.keys())
+
+    print(f"  Your profile:")
+    print(f"    - {len(seed_track_ids)} top tracks")
+    print(f"    - {len(user_artist_ids)} favorite artists")
+    print(f"    - {len(user_genre_set)} genres: {', '.join([g[0] for g in top_genres[:5]])}...")
 
     # 2. Analyze user's audio preferences from ReccoBeats
-    print("\nStep 2: Analyzing your music preferences...")
+    print("\nStep 2: Analyzing your audio preferences...")
     audio_features = get_reccobeats_audio_features(seed_track_ids, max_tracks=20)
 
     # 3. Make multiple ReccoBeats API calls with different seed combinations
@@ -221,12 +239,27 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
                 try:
                     spotify_track = sp.track(spotify_id)
 
+                    # Get artist details to check genres
+                    artist_id = spotify_track['artists'][0]['id'] if spotify_track['artists'] else None
+                    artist_name = spotify_track['artists'][0]['name'] if spotify_track['artists'] else ''
+                    artist_genres = []
+
+                    # Fetch artist info for genre matching
+                    if artist_id:
+                        try:
+                            artist_info = sp.artist(artist_id)
+                            artist_genres = artist_info.get('genres', [])
+                        except:
+                            pass
+
                     seen_track_ids.add(spotify_id)
                     all_recommendations.append({
                         'id': spotify_id,
                         'name': spotify_track['name'],
-                        'artist': ', '.join([a['name'] for a in spotify_track['artists']]),
-                        'artist_id': spotify_track['artists'][0]['id'] if spotify_track['artists'] else None,
+                        'artist': artist_name,
+                        'artist_id': artist_id,
+                        'artist_name_lower': artist_name.lower(),
+                        'genres': artist_genres,
                         'popularity': spotify_track.get('popularity', rec_track.get('popularity', 50)),
                         'album_image': spotify_track['album']['images'][0]['url'] if spotify_track.get('album', {}).get('images') else None,
                         'preview_url': spotify_track.get('preview_url'),
@@ -255,8 +288,8 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
         print("No recommendations found")
         return []
 
-    # 4. Score and rank recommendations
-    print("\nStep 4: Scoring and ranking...")
+    # 4. Score and rank recommendations (HEAVY GENRE + ARTIST FOCUS)
+    print("\nStep 4: Scoring recommendations (genre + artist focused)...")
 
     # Get liked artists for boosting
     liked_artists = set()
@@ -265,32 +298,69 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
         for liked in liked_tracks_data:
             artist = liked.get('artist_name', '')
             if artist:
-                liked_artists.add(artist)
+                liked_artists.add(artist.lower())
 
-    # Calculate scores
+    # Calculate scores with HEAVY genre/artist weighting
+    genre_matches = 0
+    artist_matches = 0
+
     for rec in all_recommendations:
         score = 0.0
 
-        # Popularity score (30% weight)
-        popularity_score = rec['popularity'] / 100.0
-        score += popularity_score * 0.3
+        # === GENRE MATCHING (50% weight!) ===
+        rec_genres = set(rec.get('genres', []))
+        if rec_genres and user_genre_set:
+            genre_overlap = len(rec_genres & user_genre_set)
+            genre_match_ratio = genre_overlap / len(user_genre_set) if user_genre_set else 0
+            score += genre_match_ratio * 0.5
+            if genre_overlap > 0:
+                genre_matches += 1
+        else:
+            # No genre info = penalty
+            score -= 0.2
 
-        # Boost if artist matches liked tracks (25% bonus)
-        if liked_artists and rec['artist'] in liked_artists:
+        # === ARTIST MATCHING (30% weight!) ===
+        # Exact artist match (user's top artists)
+        if rec['artist_id'] in user_artist_ids:
+            score += 0.3
+            artist_matches += 1
+        # Artist name match (case-insensitive)
+        elif rec['artist_name_lower'] in user_artist_names:
             score += 0.25
+            artist_matches += 1
+        # Liked artist match
+        elif liked_artists and rec['artist_name_lower'] in liked_artists:
+            score += 0.2
 
-        # Prefer earlier batches slightly (more relevant to original seeds)
-        batch_penalty = rec['batch'] * 0.02
+        # === POPULARITY (10% weight) ===
+        popularity_score = rec['popularity'] / 100.0
+        score += popularity_score * 0.1
+
+        # === BATCH PREFERENCE (5% weight) ===
+        # Earlier batches use more specific seeds
+        batch_penalty = rec['batch'] * 0.01
         score -= batch_penalty
 
-        # Add randomization for diversity (±10%)
-        random_factor = random.uniform(-0.1, 0.1)
+        # === DIVERSITY RANDOMIZATION (±5%) ===
+        random_factor = random.uniform(-0.05, 0.05)
         score += random_factor
 
         rec['score'] = score
 
+    print(f"    Genre matches: {genre_matches}/{len(all_recommendations)} ({genre_matches/len(all_recommendations)*100:.1f}%)")
+    print(f"    Artist matches: {artist_matches}/{len(all_recommendations)} ({artist_matches/len(all_recommendations)*100:.1f}%)")
+
     # Sort by score
     all_recommendations.sort(key=lambda x: x['score'], reverse=True)
+
+    # Filter out low-scoring recommendations (quality threshold)
+    min_score_threshold = 0.15  # Require at least 15% match
+    high_quality_recs = [r for r in all_recommendations if r['score'] >= min_score_threshold]
+
+    if len(high_quality_recs) < len(all_recommendations):
+        filtered_low_quality = len(all_recommendations) - len(high_quality_recs)
+        print(f"    Filtered out {filtered_low_quality} low-quality recommendations (score < {min_score_threshold})")
+        all_recommendations = high_quality_recs
 
     # 5. Apply diversity filter
     print("\nStep 5: Applying diversity filters...")
