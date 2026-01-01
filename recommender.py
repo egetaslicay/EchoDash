@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from ml_recommender import get_recommendations_ml
+from reccobeats_recommender import get_recommendations_reccobeats
 
 
 
@@ -79,11 +80,12 @@ def recommend_tracks(top_tracks, candidates, top_n=10):
 
 def get_recommendations(sp, top_tracks, top_artists, limit=50, user_id=None):
     """
-    Generate up to `limit` fresh recommendations using ML-based recommendation engine.
+    Generate up to `limit` fresh recommendations using ReccoBeats API.
 
     Recommendation Strategy (in order of priority):
-    1. ML-based: Uses genre matching, artist similarity, and user feedback
-    2. Fallback: Basic recommendation using Spotify's related artists
+    1. ReccoBeats API: Free music recommendation service with millions of tracks
+    2. Spotify ML-based: Uses genre matching, artist similarity, and user feedback
+    3. Fallback: Basic recommendation using Spotify's related artists
 
     Args:
         sp: Spotipy client
@@ -96,18 +98,29 @@ def get_recommendations(sp, top_tracks, top_artists, limit=50, user_id=None):
         List of recommended tracks with metadata
     """
 
-    # Try ML-based recommendations first (best quality)
+    # Try ReccoBeats first (free, high-quality recommendations)
     try:
-        print("Attempting ML-based recommendations with user feedback...")
+        print("Attempting ReccoBeats API recommendations...")
+        recommendations = get_recommendations_reccobeats(sp, top_tracks, top_artists, limit, user_id)
+        if recommendations:
+            return recommendations
+        print("ReccoBeats recommendations returned empty, trying Spotify ML method...")
+    except Exception as e:
+        print(f"ReccoBeats API not available: {e}")
+        print("Falling back to Spotify ML recommendations...")
+
+    # Try Spotify ML-based recommendations as backup
+    try:
+        print("Attempting Spotify ML-based recommendations...")
         recommendations = get_recommendations_ml(sp, top_tracks, top_artists, limit, user_id)
         if recommendations:
             return recommendations
-        print("ML recommendations returned empty, trying fallback...")
+        print("Spotify ML recommendations returned empty, trying basic fallback...")
     except Exception as e:
-        print(f"ML recommender not available: {e}")
-        print("Falling back to basic Spotify recommendations...")
+        print(f"Spotify ML recommender not available: {e}")
+        print("Falling back to basic method...")
 
-    # Fallback to basic Spotify method
+    # Final fallback to basic Spotify method
     return _get_recommendations_fallback(sp, top_tracks, top_artists, limit)
 
 
