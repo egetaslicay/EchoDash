@@ -8,6 +8,7 @@ Note: Audio features API was deprecated by Spotify.
 import numpy as np
 import pandas as pd
 from typing import List, Dict
+import random
 import database as db
 
 
@@ -36,20 +37,23 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
 
     print("=== Genre & Artist-Based Recommendation Engine ===")
 
-    # 0. Get user feedback if available
+    # 0. Get user feedback and recommendation history
     user_feedback = {}
     liked_tracks = []
     liked_track_ids = set()
     disliked_track_ids = set()
+    recently_recommended_ids = set()
 
     if user_id:
-        print("Step 0: Loading user feedback...")
+        print("Step 0: Loading user feedback and history...")
         user_feedback = db.get_user_feedback(user_id)
         liked_tracks = db.get_liked_tracks(user_id)
         liked_track_ids = {t['track_id'] for t in liked_tracks}
         disliked_track_ids = {t['track_id'] for t in db.get_disliked_tracks(user_id)}
+        recently_recommended_ids = db.get_recently_recommended_track_ids(user_id, days=3)
         print(f"  Found {len(liked_tracks)} liked tracks and {len(disliked_track_ids)} disliked tracks")
-        print(f"  Excluding {len(liked_track_ids) + len(disliked_track_ids)} tracks from recommendations")
+        print(f"  Found {len(recently_recommended_ids)} recently recommended tracks (last 3 days)")
+        print(f"  Excluding {len(liked_track_ids) + len(disliked_track_ids) + len(recently_recommended_ids)} tracks from recommendations")
 
     # 1. Collect user's listening history
     print("\nStep 1: Collecting user's listening history...")
@@ -97,8 +101,8 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                 top_tracks_artist = sp.artist_top_tracks(artist_id, country="US")["tracks"][:3]
                 for track in top_tracks_artist:
                     track_id = track["id"]
-                    # Exclude tracks already in user's library, liked, or disliked
-                    if track_id in disliked_track_ids or track_id in liked_track_ids:
+                    # Exclude tracks already in user's library, liked, disliked, or recently recommended
+                    if track_id in disliked_track_ids or track_id in liked_track_ids or track_id in recently_recommended_ids:
                         filtered_count += 1
                         continue
                     if track_id not in user_track_ids:
@@ -124,8 +128,8 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                         rel_tracks = sp.artist_top_tracks(rel["id"], country="US")["tracks"][:2]
                         for track in rel_tracks:
                             track_id = track["id"]
-                            # Exclude tracks already in user's library, liked, or disliked
-                            if track_id in disliked_track_ids or track_id in liked_track_ids:
+                            # Exclude tracks already in user's library, liked, disliked, or recently recommended
+                            if track_id in disliked_track_ids or track_id in liked_track_ids or track_id in recently_recommended_ids:
                                 filtered_count += 1
                                 continue
                             if track_id not in user_track_ids:
@@ -156,7 +160,7 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
         candidates_df = candidates_df.drop_duplicates(subset=["id"])
     print(f"Collected {len(candidates_df)} candidate tracks")
     if filtered_count > 0:
-        print(f"  ⛔ Filtered out {filtered_count} tracks (liked + disliked)")
+        print(f"  ⛔ Filtered out {filtered_count} tracks (liked + disliked + recently recommended)")
 
     if candidates_df.empty:
         print("No candidates found")
@@ -198,6 +202,10 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
         if liked_artists and track["artist"] in liked_artists:
             score += 0.25
             print(f"  ⭐ Boosted {track['name']} - artist match with liked tracks")
+
+        # Add small random factor for diversity (±5%)
+        random_factor = random.uniform(-0.05, 0.05)
+        score += random_factor
 
         scores.append(score)
 

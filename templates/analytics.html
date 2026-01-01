@@ -195,12 +195,12 @@
     <div class="row">
       <div class="col-lg-6 mb-4">
         <div class="chart-card">
-          <div id="top-artists-bar"></div>
+          {{ charts.top_artists_bar | safe }}
         </div>
       </div>
       <div class="col-lg-6 mb-4">
         <div class="chart-card">
-          <div id="genre-distribution"></div>
+          {{ charts.genre_distribution | safe }}
         </div>
       </div>
     </div>
@@ -209,12 +209,12 @@
     <div class="row">
       <div class="col-lg-6 mb-4">
         <div class="chart-card">
-          <div id="artist-popularity"></div>
+          {{ charts.artist_popularity | safe }}
         </div>
       </div>
       <div class="col-lg-6 mb-4">
         <div class="chart-card">
-          <div id="track-popularity"></div>
+          {{ charts.track_popularity | safe }}
         </div>
       </div>
     </div>
@@ -222,31 +222,5 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Render Plotly charts
-    const charts = {
-      'top-artists-bar': {{ charts.top_artists_bar | safe }},
-      'genre-distribution': {{ charts.genre_distribution | safe }},
-      'artist-popularity': {{ charts.artist_popularity | safe }},
-      'track-popularity': {{ charts.track_popularity | safe }}
-    };
-
-    // Render each chart
-    for (const [id, data] of Object.entries(charts)) {
-      const element = document.getElementById(id);
-      if (!element) continue;
-
-      try {
-        if (data && (data.data || data.layout)) {
-          Plotly.newPlot(id, data.data || [], data.layout || {}, {responsive: true});
-        } else {
-          element.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">No data available</div>';
-        }
-      } catch (error) {
-        console.error(`Error rendering chart ${id}:`, error);
-        element.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Error loading chart</div>';
-      }
-    }
-  </script>
 </body>
 </html>

@@ -234,6 +234,27 @@ def get_user_recommendations_history(user_id: int, limit: int = 50) -> List[Dict
     return [dict(row) for row in rows]
 
 
+def get_recently_recommended_track_ids(user_id: int, days: int = 7) -> set:
+    """
+    Get track IDs that were recently recommended to avoid showing them again.
+    Returns a set of track IDs from the last N days.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT DISTINCT track_id
+        FROM recommendations
+        WHERE user_id = ?
+        AND created_at >= datetime('now', '-' || ? || ' days')
+    ''', (user_id, days))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return {row['track_id'] for row in rows if row['track_id']}
+
+
 def get_user_stats(user_id: int) -> Dict:
     """
     Get aggregate statistics for a user.
