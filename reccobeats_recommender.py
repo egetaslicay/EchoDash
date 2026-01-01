@@ -9,6 +9,65 @@ import random
 import database as db
 
 
+def get_reccobeats_audio_features(spotify_track_ids, max_tracks=20):
+    """
+    Get audio features from ReccoBeats API for a list of Spotify track IDs.
+
+    Args:
+        spotify_track_ids: List of Spotify track IDs
+        max_tracks: Maximum number of tracks to analyze (to avoid rate limits)
+
+    Returns:
+        Dict with average audio features, or empty dict if failed
+    """
+    print(f"\n  Analyzing audio features for {min(len(spotify_track_ids), max_tracks)} tracks via ReccoBeats...")
+
+    features_list = []
+    sample_tracks = spotify_track_ids[:max_tracks]
+
+    for i, spotify_id in enumerate(sample_tracks):
+        try:
+            # Try using Spotify ID directly
+            url = f"https://api.reccobeats.com/v1/track/{spotify_id}/audio-features"
+            response = requests.get(url, timeout=5)
+
+            if response.status_code == 200:
+                features = response.json()
+                features_list.append(features)
+            elif response.status_code == 404:
+                # Track not found in ReccoBeats, skip
+                continue
+            else:
+                print(f"    Warning: Error getting features for track {i+1}: {response.status_code}")
+                continue
+
+        except Exception as e:
+            print(f"    Warning: Failed to get features for track {i+1}: {e}")
+            continue
+
+    if not features_list:
+        print("  ⚠️ Could not get audio features from ReccoBeats")
+        return {}
+
+    # Calculate averages
+    avg_features = {}
+    feature_keys = ['danceability', 'energy', 'valence', 'acousticness', 'instrumentalness',
+                    'speechiness', 'tempo', 'loudness']
+
+    for key in feature_keys:
+        values = [f[key] for f in features_list if key in f and f[key] is not None]
+        if values:
+            avg_features[key] = sum(values) / len(values)
+
+    print(f"  ✓ Analyzed {len(features_list)} tracks")
+    if avg_features:
+        print(f"    Avg features: energy={avg_features.get('energy', 0):.2f}, "
+              f"danceability={avg_features.get('danceability', 0):.2f}, "
+              f"valence={avg_features.get('valence', 0):.2f}")
+
+    return avg_features
+
+
 def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_id=None):
     """
     Generate music recommendations using ReccoBeats API.
@@ -56,8 +115,12 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
 
     print(f"  Seed pool: {len(seed_track_ids)} tracks")
 
-    # 2. Make multiple ReccoBeats API calls with different seed combinations
-    print("\nStep 2: Generating recommendations from ReccoBeats...")
+    # 2. Analyze user's audio preferences from ReccoBeats
+    print("\nStep 2: Analyzing your music preferences...")
+    audio_features = get_reccobeats_audio_features(seed_track_ids, max_tracks=20)
+
+    # 3. Make multiple ReccoBeats API calls with different seed combinations
+    print("\nStep 3: Generating recommendations from ReccoBeats...")
     all_recommendations = []
     seen_track_ids = set()
     filtered_count = 0
@@ -84,6 +147,21 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
             # Build query parameters - ReccoBeats accepts repeated 'seeds' parameters
             params = [('seeds', seed_id) for seed_id in batch_seeds]
             params.append(('size', 20))  # Get 20 recommendations per batch
+
+            # Add audio features if available (with slight randomization for diversity)
+            if audio_features:
+                for key, value in audio_features.items():
+                    # Add ±10% randomization to features for variety across batches
+                    varied_value = value + random.uniform(-0.1, 0.1) * value
+                    # Clamp to valid ranges
+                    if key == 'tempo':
+                        varied_value = max(0, min(250, varied_value))
+                    elif key == 'loudness':
+                        varied_value = max(-60, min(2, varied_value))
+                    else:
+                        varied_value = max(0, min(1, varied_value))
+                    params.append((key, round(varied_value, 4)))
+                print(f"    Using audio features: {len(audio_features)} parameters")
 
             print(f"    Calling ReccoBeats API...")
             response = requests.get(reccobeats_url, params=params, timeout=10)
@@ -177,8 +255,8 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
         print("No recommendations found")
         return []
 
-    # 3. Score and rank recommendations
-    print("\nStep 3: Scoring and ranking...")
+    # 4. Score and rank recommendations
+    print("\nStep 4: Scoring and ranking...")
 
     # Get liked artists for boosting
     liked_artists = set()
@@ -214,8 +292,8 @@ def get_recommendations_reccobeats(sp, top_tracks, top_artists, limit=50, user_i
     # Sort by score
     all_recommendations.sort(key=lambda x: x['score'], reverse=True)
 
-    # 4. Apply diversity filter
-    print("\nStep 4: Applying diversity filters...")
+    # 5. Apply diversity filter
+    print("\nStep 5: Applying diversity filters...")
     final_recommendations = []
     artist_counts = {}
     max_per_artist = 2
