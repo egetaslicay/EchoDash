@@ -372,3 +372,36 @@ def delete_feedback(user_id: int, track_id: str):
 # Initialize database on module import
 if not os.path.exists(DB_PATH):
     init_db()
+else:
+    # Ensure new tables exist in existing databases (migration)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if user_feedback table exists
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='user_feedback'
+    """)
+
+    if not cursor.fetchone():
+        print("Adding user_feedback table to existing database...")
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                track_id TEXT NOT NULL,
+                track_name TEXT,
+                artist_name TEXT,
+                feedback INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(user_id, track_id)
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_user ON user_feedback(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_track ON user_feedback(track_id)')
+        conn.commit()
+        print("✓ user_feedback table added successfully")
+
+    conn.close()
+

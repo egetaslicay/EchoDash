@@ -83,6 +83,7 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
     # 3. Build candidate pool from related artists
     print("\nStep 3: Building candidate pool from related artists...")
     candidates = []
+    filtered_count = 0
 
     for artist in top_artists[:10]:
         try:
@@ -94,7 +95,10 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                 for track in top_tracks_artist:
                     track_id = track["id"]
                     # Exclude tracks already in user's library or disliked
-                    if track_id not in user_track_ids and track_id not in disliked_track_ids:
+                    if track_id in disliked_track_ids:
+                        filtered_count += 1
+                        continue
+                    if track_id not in user_track_ids:
                         candidates.append({
                             "id": track_id,
                             "name": track["name"],
@@ -118,7 +122,10 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
                         for track in rel_tracks:
                             track_id = track["id"]
                             # Exclude tracks already in user's library or disliked
-                            if track_id not in user_track_ids and track_id not in disliked_track_ids:
+                            if track_id in disliked_track_ids:
+                                filtered_count += 1
+                                continue
+                            if track_id not in user_track_ids:
                                 candidates.append({
                                     "id": track_id,
                                     "name": track["name"],
@@ -145,6 +152,8 @@ def get_recommendations_ml(sp, top_tracks, top_artists, limit=50, user_id=None):
     if not candidates_df.empty:
         candidates_df = candidates_df.drop_duplicates(subset=["id"])
     print(f"Collected {len(candidates_df)} candidate tracks")
+    if filtered_count > 0:
+        print(f"  ⛔ Filtered out {filtered_count} disliked tracks")
 
     if candidates_df.empty:
         print("No candidates found")

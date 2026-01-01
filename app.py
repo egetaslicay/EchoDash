@@ -177,27 +177,53 @@ def analytics():
     user_image = user_profile["images"][0]["url"] if user_profile["images"] else None
 
     # Get listening data
-    tracks_short = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
-    artists_short = sp.current_user_top_artists(limit=20, time_range="short_term")["items"]
+    try:
+        tracks_short = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
+        artists_short = sp.current_user_top_artists(limit=20, time_range="short_term")["items"]
+    except Exception as e:
+        print(f"Error fetching Spotify data: {e}")
+        tracks_short = []
+        artists_short = []
 
     # Generate visualizations (without deprecated audio features API)
     charts = {}
 
-    # 1. Top Artists Bar Chart
-    charts['top_artists_bar'] = create_top_artists_chart(artists_short[:10])
+    try:
+        # 1. Top Artists Bar Chart
+        if artists_short:
+            charts['top_artists_bar'] = create_top_artists_chart(artists_short[:10])
+    except Exception as e:
+        print(f"Error creating top artists chart: {e}")
 
-    # 2. Genre Distribution Pie Chart
-    charts['genre_distribution'] = create_genre_distribution(artists_short)
+    try:
+        # 2. Genre Distribution Pie Chart
+        if artists_short:
+            charts['genre_distribution'] = create_genre_distribution(artists_short)
+    except Exception as e:
+        print(f"Error creating genre distribution chart: {e}")
 
-    # 3. Artist Popularity Chart
-    charts['artist_popularity'] = create_artist_popularity_chart(artists_short[:15])
+    try:
+        # 3. Artist Popularity Chart
+        if artists_short:
+            charts['artist_popularity'] = create_artist_popularity_chart(artists_short[:15])
+    except Exception as e:
+        print(f"Error creating artist popularity chart: {e}")
 
-    # 4. Track Popularity Chart
-    charts['track_popularity'] = create_track_popularity_chart(tracks_short)
+    try:
+        # 4. Track Popularity Chart
+        if tracks_short:
+            charts['track_popularity'] = create_track_popularity_chart(tracks_short)
+    except Exception as e:
+        print(f"Error creating track popularity chart: {e}")
 
     # Convert plots to JSON for embedding in HTML
-    charts_json = {key: json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder)
-                   for key, chart in charts.items()}
+    charts_json = {}
+    for key, chart in charts.items():
+        try:
+            charts_json[key] = json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder)
+        except Exception as e:
+            print(f"Error encoding chart {key}: {e}")
+            charts_json[key] = '{}'
 
     return render_template(
         "analytics.html",
