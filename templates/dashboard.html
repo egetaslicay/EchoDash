@@ -9,49 +9,55 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Inter', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background:
+        radial-gradient(ellipse at top right, rgba(240, 147, 251, 0.2) 0%, transparent 55%),
+        radial-gradient(ellipse at bottom left, rgba(79, 172, 254, 0.18) 0%, transparent 55%),
+        linear-gradient(135deg, #5a4fcf 0%, #764ba2 55%, #6b48c8 100%);
       min-height: 100vh;
       color: #2d3748;
     }
 
-    /* Modern Navbar */
+    /* ── Navbar ── */
     .navbar {
-      background: rgba(255, 255, 255, 0.95) !important;
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      padding: 1rem 0;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.97) !important;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 0.85rem 0;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.09);
     }
 
     .navbar-brand {
       font-weight: 800;
-      font-size: 24px;
+      font-size: 23px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
       letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .nav-link {
-      color: #2d3748 !important;
+      color: #374151 !important;
       font-weight: 600;
-      padding: 8px 16px !important;
-      margin: 0 4px;
-      border-radius: 8px;
-      transition: all 0.3s ease;
+      font-size: 14px;
+      padding: 8px 14px !important;
+      margin: 0 3px;
+      border-radius: 10px;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .nav-link:hover {
-      background: rgba(102, 126, 234, 0.1);
-    }
+    .nav-link:hover { background: rgba(102, 126, 234, 0.1); }
 
     .nav-link.active {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -65,24 +71,28 @@
     }
 
     .profile-img {
-      width: 45px;
-      height: 45px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       object-fit: cover;
-      border: 3px solid #667eea;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      border: 2.5px solid #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
     }
 
     .btn-logout {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border: none;
-      padding: 10px 24px;
+      padding: 9px 22px;
       border-radius: 25px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      text-decoration: none;
     }
 
     .btn-logout:hover {
@@ -91,360 +101,514 @@
       color: white;
     }
 
-    /* Dashboard Header */
+    /* ── Dashboard Header ── */
     .dashboard-header {
-      padding: 40px 0 30px;
+      padding: 48px 0 24px;
       text-align: center;
     }
 
     .dashboard-title {
       color: white;
-      font-size: 42px;
+      font-size: 44px;
       font-weight: 800;
       margin-bottom: 10px;
-      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      text-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+      letter-spacing: -1px;
     }
 
     .dashboard-subtitle {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 18px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 17px;
       font-weight: 400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
-    /* Filters */
-    .filters-container {
+    .dashboard-subtitle .dot {
+      width: 5px;
+      height: 5px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 50%;
+    }
+
+    /* ── Stats Row ── */
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 0 20px 40px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      padding: 22px 30px;
+      text-align: center;
+      min-width: 150px;
+      transition: all 0.3s ease;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.26);
+      transform: translateY(-5px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+      margin: 0 auto 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 800;
+      color: white;
+      line-height: 1;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ── Filters ── */
+    .filters-wrapper {
       display: flex;
       justify-content: center;
-      gap: 15px;
-      margin-bottom: 40px;
+      margin-bottom: 36px;
+    }
+
+    .filters-container {
+      display: flex;
+      gap: 12px;
       flex-wrap: wrap;
+      justify-content: center;
+      background: rgba(255,255,255,0.14);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 18px;
+      padding: 14px 20px;
     }
 
     .filter-select {
       background: white;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 15px;
-      padding: 12px 20px;
-      font-size: 15px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-size: 14px;
       font-weight: 600;
-      min-width: 180px;
+      min-width: 170px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      transition: all 0.25s ease;
+      color: #374151;
     }
 
     .filter-select:focus {
       outline: none;
       border-color: #667eea;
-      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
     }
 
-    /* Modern Cards */
+    /* ── Modern Cards ── */
     .content-card {
       background: white;
       border-radius: 24px;
-      padding: 30px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-      margin-bottom: 30px;
+      padding: 28px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.09);
+      margin-bottom: 28px;
       animation: fadeIn 0.6s ease-out;
-      transition: all 0.3s ease;
+      transition: box-shadow 0.3s ease, transform 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
 
     .content-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.13);
+    }
+
+    /* Color accent bar at top of each card type */
+    .content-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+
+    .card-tracks::before   { background: linear-gradient(90deg, #667eea, #764ba2); }
+    .card-artists::before  { background: linear-gradient(90deg, #f093fb, #f5576c); }
+    .card-recs::before     { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+    .card-liked::before    { background: linear-gradient(90deg, #43e97b, #38f9d7); }
+    .card-disliked::before { background: linear-gradient(90deg, #f78ca0, #f5576c); }
+
+    /* Alias for feedback section cards */
+    .card-modern {
+      background: white;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.09);
+      margin-bottom: 28px;
+      animation: fadeIn 0.6s ease-out;
+      transition: box-shadow 0.3s ease, transform 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-modern:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.13);
+    }
+
+    .card-modern::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     .card-header-custom {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 25px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #f0f0f0;
+      gap: 14px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1.5px solid #f0f0f0;
     }
 
     .card-icon {
       width: 50px;
       height: 50px;
-      border-radius: 15px;
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 22px;
       color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
     }
 
-    .icon-tracks {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    .icon-artists {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-
-    .icon-recommendations {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
+    .icon-tracks        { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .icon-artists       { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .icon-recommendations { background: linear-gradient(135deg, #4facfe, #00f2fe); }
 
     .card-title-custom {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      color: #2d3748;
+      color: #1f2937;
       margin: 0;
+      letter-spacing: -0.3px;
     }
 
-    /* List Items */
-    .music-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
+    .card-subtitle-custom {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 3px 0 0;
+      font-weight: 500;
     }
+
+    /* ── Music List Items ── */
+    .music-list { list-style: none; padding: 0; margin: 0; }
 
     .music-item {
       display: flex;
       align-items: center;
-      gap: 15px;
-      padding: 15px;
-      border-radius: 15px;
-      margin-bottom: 10px;
-      transition: all 0.3s ease;
-      background: #f8f9fa;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 8px;
+      transition: all 0.25s ease;
+      background: #f9fafb;
+      border: 1px solid transparent;
     }
 
     .music-item:hover {
-      background: #e9ecef;
-      transform: translateX(5px);
+      background: linear-gradient(135deg, #eef0ff, #f5f0ff);
+      border-color: rgba(102, 126, 234, 0.18);
+      transform: translateX(4px);
     }
 
-    .item-number {
-      font-size: 18px;
-      font-weight: 700;
-      color: #667eea;
-      min-width: 30px;
-      text-align: center;
+    .music-item:hover .item-image {
+      transform: scale(1.06);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
     }
+
+    /* Gradient circle rank badges */
+    .item-number {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 30px;
+      flex-shrink: 0;
+      box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Top 3 special rank colours */
+    .rank-gold   { background: linear-gradient(135deg, #f6d365, #fda085) !important; box-shadow: 0 3px 10px rgba(253,160,133,0.4) !important; }
+    .rank-silver { background: linear-gradient(135deg, #94a3b8, #cbd5e1) !important; box-shadow: 0 3px 10px rgba(148,163,184,0.4) !important; }
+    .rank-bronze { background: linear-gradient(135deg, #cd7f32, #d4a06a) !important; box-shadow: 0 3px 10px rgba(205,127,50,0.4) !important;  }
 
     .item-image {
-      width: 60px;
-      height: 60px;
+      width: 56px;
+      height: 56px;
       object-fit: cover;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+      transition: all 0.25s ease;
+      flex-shrink: 0;
     }
 
-    .item-info {
-      flex: 1;
-    }
+    .item-info { flex: 1; min-width: 0; }
 
     .item-name {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
-      color: #2d3748;
-      margin-bottom: 4px;
+      color: #1f2937;
+      margin-bottom: 3px;
       display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .item-artist {
-      font-size: 14px;
-      color: #718096;
+      font-size: 13px;
+      color: #6b7280;
     }
 
-    /* Recommendations specific */
+    /* Genre chips for artists */
+    .genre-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 5px;
+    }
+
+    .genre-tag {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+      text-transform: capitalize;
+    }
+
+    /* ── Recommendation Items ── */
     .rec-item {
       display: flex;
       align-items: center;
-      gap: 15px;
-      padding: 20px;
-      border-radius: 15px;
-      margin-bottom: 15px;
-      background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-      border: 2px solid transparent;
-      transition: all 0.3s ease;
+      gap: 14px;
+      padding: 16px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      background: #f9fafb;
+      border: 1.5px solid transparent;
+      transition: all 0.25s ease;
     }
 
     .rec-item:hover {
       border-color: #4facfe;
-      transform: translateX(5px);
-      box-shadow: 0 5px 20px rgba(79, 172, 254, 0.2);
+      background: linear-gradient(135deg, #f0f9ff, #ffffff);
+      box-shadow: 0 6px 22px rgba(79, 172, 254, 0.18);
+      transform: translateX(4px);
     }
 
     .rec-score {
       background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
       color: white;
-      padding: 8px 15px;
+      padding: 7px 14px;
       border-radius: 20px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(79,172,254,0.3);
     }
 
     .audio-player {
-      height: 35px;
+      height: 34px;
       border-radius: 20px;
-      background: #f0f0f0;
+      min-width: 130px;
+      max-width: 180px;
     }
 
     .btn-spotify-open {
-      background: #1DB954;
+      background: linear-gradient(135deg, #1DB954, #17a745);
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 9px 18px;
       border-radius: 20px;
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 12px;
       text-decoration: none;
       white-space: nowrap;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
+      box-shadow: 0 3px 10px rgba(29,185,84,0.28);
     }
 
     .btn-spotify-open:hover {
-      background: #1ed760;
+      background: linear-gradient(135deg, #1ed760, #1DB954);
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
+      box-shadow: 0 6px 18px rgba(29, 185, 84, 0.38);
       color: white;
     }
 
-    /* Feedback buttons */
-    .feedback-buttons {
-      display: flex;
-      gap: 8px;
-    }
+    /* ── Feedback Buttons ── */
+    .feedback-buttons { display: flex; gap: 7px; }
 
     .btn-feedback {
       background: white;
-      border: 2px solid #e2e8f0;
-      color: #718096;
-      padding: 8px 12px;
+      border: 1.5px solid #e5e7eb;
+      color: #9ca3af;
+      padding: 7px 11px;
       border-radius: 10px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
       font-size: 14px;
     }
 
-    .btn-feedback:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
+    .btn-feedback:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.09); }
+    .btn-like:hover    { border-color: #48bb78; color: #48bb78; }
+    .btn-like.active   { background: #48bb78; border-color: #48bb78; color: white; }
+    .btn-dislike:hover { border-color: #f56565; color: #f56565; }
+    .btn-dislike.active{ background: #f56565; border-color: #f56565; color: white; }
 
-    .btn-like:hover {
-      border-color: #48bb78;
-      color: #48bb78;
-    }
-
-    .btn-like.active {
-      background: #48bb78;
-      border-color: #48bb78;
-      color: white;
-    }
-
-    .btn-dislike:hover {
-      border-color: #f56565;
-      color: #f56565;
-    }
-
-    .btn-dislike.active {
-      background: #f56565;
-      border-color: #f56565;
-      color: white;
-    }
-
-    /* Feedback track items */
+    /* ── Feedback Track Items ── */
     .feedback-track-item {
       display: flex;
       align-items: center;
-      gap: 15px;
-      padding: 15px;
-      border-radius: 10px;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 12px;
       margin-bottom: 10px;
-      background: #f8f9fa;
-      transition: all 0.3s ease;
+      background: #f9fafb;
+      transition: all 0.25s ease;
+      border: 1px solid transparent;
     }
 
     .feedback-track-item:hover {
-      transform: translateX(5px);
-      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+      transform: translateX(4px);
+      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
     }
 
     .feedback-track-item.liked {
       border-left: 4px solid #48bb78;
+      background: #f0fdf4;
     }
 
     .feedback-track-item.disliked {
       border-left: 4px solid #f56565;
+      background: #fff5f5;
     }
 
     .btn-remove-feedback {
       background: white;
-      border: 2px solid #e2e8f0;
-      color: #718096;
+      border: 1.5px solid #e5e7eb;
+      color: #9ca3af;
       padding: 6px 10px;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
       margin-left: auto;
+      flex-shrink: 0;
     }
 
     .btn-remove-feedback:hover {
       background: #f56565;
       border-color: #f56565;
       color: white;
-      transform: scale(1.1);
+      transform: scale(1.08);
     }
 
-    /* Container */
+    /* ── Layout ── */
     .container-custom {
-      max-width: 1400px;
+      max-width: 1380px;
       margin: 0 auto;
       padding: 0 20px;
     }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-      .dashboard-title {
-        font-size: 32px;
-      }
-
-      .card-title-custom {
-        font-size: 20px;
-      }
-
-      .item-image {
-        width: 50px;
-        height: 50px;
-      }
-
-      .rec-item {
-        flex-wrap: wrap;
-      }
-
-      .audio-player {
-        width: 100%;
-      }
+    /* ── Empty States ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: #9ca3af;
     }
 
-    /* Loading animation */
-    .loading-pulse {
-      animation: pulse 2s infinite;
+    .empty-state i {
+      font-size: 44px;
+      margin-bottom: 14px;
+      opacity: 0.3;
+      display: block;
     }
+
+    .empty-state p {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      text-align: center;
+      padding: 28px 20px;
+      color: rgba(255,255,255,0.45);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Loading ── */
+    .loading-pulse { animation: pulse 2s infinite; }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .dashboard-title { font-size: 32px; }
+      .card-title-custom { font-size: 18px; }
+      .item-image { width: 48px; height: 48px; }
+      .rec-item { flex-wrap: wrap; }
+      .audio-player { width: 100%; max-width: 100%; }
+      .stat-card { min-width: 130px; padding: 18px 22px; }
+      .stat-value { font-size: 28px; }
     }
   </style>
 </head>
@@ -488,51 +652,90 @@
   <div class="dashboard-header">
     <div class="container-custom">
       <h1 class="dashboard-title">Your Music Universe</h1>
-      <p class="dashboard-subtitle">Powered by ML • Personalized for You</p>
+      <p class="dashboard-subtitle">
+        Powered by ML
+        <span class="dot"></span>
+        Personalized for You
+      </p>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="container-custom">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+          <i class="fas fa-music"></i>
+        </div>
+        <div class="stat-value">{{ tracks|length }}</div>
+        <div class="stat-label">Top Tracks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+          <i class="fas fa-microphone-alt"></i>
+        </div>
+        <div class="stat-value">{{ artists|length }}</div>
+        <div class="stat-label">Top Artists</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
+          <i class="fas fa-robot"></i>
+        </div>
+        <div class="stat-value">{{ recs|length }}</div>
+        <div class="stat-label">Recommendations</div>
+      </div>
+      {% if liked_tracks or disliked_tracks %}
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">
+          <i class="fas fa-heart"></i>
+        </div>
+        <div class="stat-value">{{ (liked_tracks|length) + (disliked_tracks|length) }}</div>
+        <div class="stat-label">Feedback Given</div>
+      </div>
+      {% endif %}
     </div>
   </div>
 
   <!-- Filters -->
   <div class="container-custom">
-    <form method="get" action="{{ url_for('dashboard') }}" class="filters-container">
-      <select class="filter-select" name="time_range" onchange="this.form.submit()">
-        <option value="short_term" {% if time_range == 'short_term' %}selected{% endif %}>
-          <i class="far fa-calendar"></i> Last Month
-        </option>
-        <option value="medium_term" {% if time_range == 'medium_term' %}selected{% endif %}>
-          <i class="far fa-calendar"></i> Last 6 Months
-        </option>
-        <option value="long_term" {% if time_range == 'long_term' %}selected{% endif %}>
-          <i class="far fa-calendar"></i> Last 12 Months
-        </option>
-      </select>
-
-      <select class="filter-select" name="limit" onchange="this.form.submit()">
-        <option value="10" {% if limit == 10 %}selected{% endif %}>Top 10</option>
-        <option value="20" {% if limit == 20 %}selected{% endif %}>Top 20</option>
-        <option value="30" {% if limit == 30 %}selected{% endif %}>Top 30</option>
-        <option value="40" {% if limit == 40 %}selected{% endif %}>Top 40</option>
-        <option value="50" {% if limit == 50 %}selected{% endif %}>Top 50</option>
-      </select>
-    </form>
+    <div class="filters-wrapper">
+      <form method="get" action="{{ url_for('dashboard') }}" class="filters-container">
+        <select class="filter-select" name="time_range" onchange="this.form.submit()">
+          <option value="short_term"  {% if time_range == 'short_term'  %}selected{% endif %}>&#128197; Last Month</option>
+          <option value="medium_term" {% if time_range == 'medium_term' %}selected{% endif %}>&#128197; Last 6 Months</option>
+          <option value="long_term"   {% if time_range == 'long_term'   %}selected{% endif %}>&#128197; Last 12 Months</option>
+        </select>
+        <select class="filter-select" name="limit" onchange="this.form.submit()">
+          <option value="10" {% if limit == 10 %}selected{% endif %}>Top 10</option>
+          <option value="20" {% if limit == 20 %}selected{% endif %}>Top 20</option>
+          <option value="30" {% if limit == 30 %}selected{% endif %}>Top 30</option>
+          <option value="40" {% if limit == 40 %}selected{% endif %}>Top 40</option>
+          <option value="50" {% if limit == 50 %}selected{% endif %}>Top 50</option>
+        </select>
+      </form>
+    </div>
   </div>
 
-  <!-- Content -->
-  <div class="container-custom pb-5">
+  <!-- Main Content -->
+  <div class="container-custom pb-4">
     <div class="row">
+
       <!-- Top Tracks -->
       <div class="col-lg-6 mb-4">
-        <div class="content-card">
+        <div class="content-card card-tracks">
           <div class="card-header-custom">
-            <div class="card-icon icon-tracks">
-              <i class="fas fa-music"></i>
+            <div class="card-icon icon-tracks"><i class="fas fa-music"></i></div>
+            <div>
+              <h2 class="card-title-custom">Top Tracks</h2>
+              <p class="card-subtitle-custom">Your most-played songs</p>
             </div>
-            <h2 class="card-title-custom">Top Tracks</h2>
           </div>
           <ol class="music-list">
             {% for track in tracks %}
               <li class="music-item">
-                <span class="item-number">{{ loop.index }}</span>
+                <span class="item-number {% if loop.index == 1 %}rank-gold{% elif loop.index == 2 %}rank-silver{% elif loop.index == 3 %}rank-bronze{% endif %}">
+                  {{ loop.index }}
+                </span>
                 <img src="{{ track.album.images[2].url if track.album.images else '' }}"
                      alt="Album" class="item-image">
                 <div class="item-info">
@@ -547,21 +750,31 @@
 
       <!-- Top Artists -->
       <div class="col-lg-6 mb-4">
-        <div class="content-card">
+        <div class="content-card card-artists">
           <div class="card-header-custom">
-            <div class="card-icon icon-artists">
-              <i class="fas fa-microphone"></i>
+            <div class="card-icon icon-artists"><i class="fas fa-microphone"></i></div>
+            <div>
+              <h2 class="card-title-custom">Top Artists</h2>
+              <p class="card-subtitle-custom">Artists you can't stop listening to</p>
             </div>
-            <h2 class="card-title-custom">Top Artists</h2>
           </div>
           <ol class="music-list">
             {% for artist in artists %}
               <li class="music-item">
-                <span class="item-number">{{ loop.index }}</span>
+                <span class="item-number {% if loop.index == 1 %}rank-gold{% elif loop.index == 2 %}rank-silver{% elif loop.index == 3 %}rank-bronze{% endif %}">
+                  {{ loop.index }}
+                </span>
                 <img src="{{ artist.images[2].url if artist.images else '' }}"
-                     alt="Artist" class="item-image">
+                     alt="Artist" class="item-image" style="border-radius: 50%;">
                 <div class="item-info">
                   <span class="item-name">{{ artist.name }}</span>
+                  {% if artist.genres %}
+                    <div class="genre-tags">
+                      {% for genre in artist.genres[:2] %}
+                        <span class="genre-tag">{{ genre }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
                 </div>
               </li>
             {% endfor %}
@@ -570,17 +783,13 @@
       </div>
     </div>
 
-    <!-- Recommendations -->
-    <div class="content-card">
+    <!-- ML Recommendations -->
+    <div class="content-card card-recs">
       <div class="card-header-custom">
-        <div class="card-icon icon-recommendations">
-          <i class="fas fa-robot"></i>
-        </div>
+        <div class="card-icon icon-recommendations"><i class="fas fa-robot"></i></div>
         <div>
           <h2 class="card-title-custom">ML-Powered Recommendations</h2>
-          <p style="margin: 0; color: #718096; font-size: 14px;">
-            Based on audio feature analysis
-          </p>
+          <p class="card-subtitle-custom">Based on your audio feature profile &amp; listening habits</p>
         </div>
       </div>
 
@@ -588,7 +797,9 @@
         <div>
           {% for rec in recs %}
             <div class="rec-item">
-              <span class="item-number">{{ loop.index }}</span>
+              <span class="item-number {% if loop.index == 1 %}rank-gold{% elif loop.index == 2 %}rank-silver{% elif loop.index == 3 %}rank-bronze{% endif %}">
+                {{ loop.index }}
+              </span>
               <img src="{{ rec.album_image }}" alt="Album" class="item-image">
 
               <div class="item-info">
@@ -628,9 +839,9 @@
           {% endfor %}
         </div>
       {% else %}
-        <div style="text-align: center; padding: 40px; color: #718096;">
-          <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 20px;"></i>
-          <p>Loading recommendations...</p>
+        <div class="empty-state">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Loading recommendations…</p>
         </div>
       {% endif %}
     </div>
@@ -638,20 +849,19 @@
 
   <!-- My Feedback Section -->
   {% if liked_tracks or disliked_tracks %}
-  <div class="container-custom mt-4 mb-5">
+  <div class="container-custom mt-2 mb-4">
     <div class="row">
+
       <!-- Liked Tracks -->
       <div class="col-md-6 mb-4">
-        <div class="card-modern">
+        <div class="card-modern card-liked">
           <div class="card-header-custom">
-            <div class="card-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+            <div class="card-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">
               <i class="fas fa-thumbs-up"></i>
             </div>
             <div>
               <h2 class="card-title-custom">Liked Songs</h2>
-              <p class="card-subtitle-custom">
-                <i class="fas fa-heart"></i> Tracks you enjoyed
-              </p>
+              <p class="card-subtitle-custom">Tracks you enjoyed</p>
             </div>
           </div>
 
@@ -659,7 +869,9 @@
             <div>
               {% for track in liked_tracks[:10] %}
                 <div class="feedback-track-item liked">
-                  <span class="item-number">{{ loop.index }}</span>
+                  <span class="item-number" style="background: linear-gradient(135deg,#43e97b,#38f9d7); box-shadow: 0 3px 10px rgba(67,233,123,0.35);">
+                    {{ loop.index }}
+                  </span>
                   <div class="item-info">
                     <span class="item-name">{{ track.track_name }}</span>
                     <span class="item-artist">{{ track.artist_name }}</span>
@@ -673,8 +885,8 @@
               {% endfor %}
             </div>
           {% else %}
-            <div style="text-align: center; padding: 40px; color: #999;">
-              <i class="fas fa-heart" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+            <div class="empty-state">
+              <i class="fas fa-heart"></i>
               <p>No liked songs yet. Start liking recommendations!</p>
             </div>
           {% endif %}
@@ -683,16 +895,14 @@
 
       <!-- Disliked Tracks -->
       <div class="col-md-6 mb-4">
-        <div class="card-modern">
+        <div class="card-modern card-disliked">
           <div class="card-header-custom">
-            <div class="card-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);">
+            <div class="card-icon" style="background: linear-gradient(135deg, #f78ca0, #f5576c);">
               <i class="fas fa-thumbs-down"></i>
             </div>
             <div>
               <h2 class="card-title-custom">Disliked Songs</h2>
-              <p class="card-subtitle-custom">
-                <i class="fas fa-ban"></i> Won't appear in recommendations
-              </p>
+              <p class="card-subtitle-custom">Won't appear in recommendations</p>
             </div>
           </div>
 
@@ -700,7 +910,9 @@
             <div>
               {% for track in disliked_tracks[:10] %}
                 <div class="feedback-track-item disliked">
-                  <span class="item-number">{{ loop.index }}</span>
+                  <span class="item-number" style="background: linear-gradient(135deg,#f78ca0,#f5576c); box-shadow: 0 3px 10px rgba(245,87,108,0.35);">
+                    {{ loop.index }}
+                  </span>
                   <div class="item-info">
                     <span class="item-name">{{ track.track_name }}</span>
                     <span class="item-artist">{{ track.artist_name }}</span>
@@ -714,27 +926,30 @@
               {% endfor %}
             </div>
           {% else %}
-            <div style="text-align: center; padding: 40px; color: #999;">
-              <i class="fas fa-ban" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+            <div class="empty-state">
+              <i class="fas fa-ban"></i>
               <p>No disliked songs yet.</p>
             </div>
           {% endif %}
         </div>
       </div>
+
     </div>
   </div>
   {% endif %}
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    EchoDash &nbsp;&middot;&nbsp; Powered by Spotify API &amp; Machine Learning
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     async function saveFeedback(trackId, trackName, artistName, feedback, button) {
       try {
-        // Send feedback to server
         const response = await fetch('/api/feedback', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             track_id: trackId,
             track_name: trackName,
@@ -746,12 +961,10 @@
         const data = await response.json();
 
         if (data.success) {
-          // Update button states
           const recItem = button.closest('.rec-item');
           const likeBtn = recItem.querySelector('.btn-like');
           const dislikeBtn = recItem.querySelector('.btn-dislike');
 
-          // Toggle active state
           if (feedback === 1) {
             likeBtn.classList.add('active');
             dislikeBtn.classList.remove('active');
@@ -760,18 +973,10 @@
             likeBtn.classList.remove('active');
           }
 
-          // Show brief feedback
-          button.innerHTML = feedback === 1 ?
-            '<i class="fas fa-check"></i>' :
-            '<i class="fas fa-check"></i>';
-
-          setTimeout(() => {
-            button.innerHTML = feedback === 1 ?
-              '<i class="fas fa-thumbs-up"></i>' :
-              '<i class="fas fa-thumbs-down"></i>';
-          }, 1000);
+          const origHTML = button.innerHTML;
+          button.innerHTML = '<i class="fas fa-check"></i>';
+          setTimeout(() => { button.innerHTML = origHTML; }, 1000);
         } else {
-          console.error('Failed to save feedback:', data.error);
           alert('Failed to save feedback. Please try again.');
         }
       } catch (error) {
@@ -781,20 +986,15 @@
     }
 
     async function removeFeedback(trackId, button) {
-      if (!confirm('Remove this track from your feedback list?')) {
-        return;
-      }
+      if (!confirm('Remove this track from your feedback list?')) return;
 
       try {
-        const response = await fetch(`/api/feedback/${trackId}`, {
-          method: 'DELETE'
-        });
-
+        const response = await fetch(`/api/feedback/${trackId}`, { method: 'DELETE' });
         const data = await response.json();
 
         if (data.success) {
-          // Remove the item from the DOM
           const item = button.closest('.feedback-track-item');
+          item.style.transition = 'opacity 0.3s ease';
           item.style.opacity = '0';
           setTimeout(() => item.remove(), 300);
         } else {
